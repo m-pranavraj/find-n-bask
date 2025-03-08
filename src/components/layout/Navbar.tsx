@@ -2,14 +2,23 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, Menu, X } from "lucide-react";
+import { Moon, Sun, Menu, X, User } from "lucide-react";
 import { Logo } from "../ui/logo";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useAuth } from "@/contexts/AuthContext";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const Navbar = () => {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const { user, isAuthenticated, signOut } = useAuth();
 
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light";
@@ -59,6 +68,12 @@ const Navbar = () => {
     return location.pathname.startsWith(path);
   };
 
+  const getUserInitials = () => {
+    if (!user) return "U";
+    const email = user.email || "";
+    return email.substring(0, 2).toUpperCase();
+  };
+
   return (
     <header 
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -106,22 +121,47 @@ const Navbar = () => {
           </Button>
           
           <div className="hidden md:flex items-center space-x-3">
-            <Link to="/login">
-              <Button 
-                variant={location.pathname === "/login" ? "default" : "ghost"} 
-                className="font-medium"
-              >
-                Login
-              </Button>
-            </Link>
-            <Link to="/signup">
-              <Button 
-                variant={location.pathname === "/signup" ? "secondary" : "default"} 
-                className="font-medium"
-              >
-                Sign Up
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative rounded-full h-8 w-8 flex items-center justify-center">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link to="/dashboard" className="cursor-pointer w-full">Dashboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="cursor-pointer w-full">Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button 
+                    variant={location.pathname === "/login" ? "default" : "ghost"} 
+                    className="font-medium"
+                  >
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/signup">
+                  <Button 
+                    variant={location.pathname === "/signup" ? "secondary" : "default"} 
+                    className="font-medium"
+                  >
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
           
           <Sheet>
@@ -161,16 +201,32 @@ const Navbar = () => {
                 </nav>
                 
                 <div className="mt-auto space-y-3 pt-4">
-                  <Link to="/login" className="block">
-                    <Button variant="outline" className="w-full">
-                      Login
-                    </Button>
-                  </Link>
-                  <Link to="/signup" className="block">
-                    <Button className="w-full">
-                      Sign Up
-                    </Button>
-                  </Link>
+                  {isAuthenticated ? (
+                    <>
+                      <Link to="/profile" className="block">
+                        <Button variant="outline" className="w-full">
+                          <User className="mr-2 h-4 w-4" />
+                          My Profile
+                        </Button>
+                      </Link>
+                      <Button className="w-full" onClick={() => signOut()}>
+                        Logout
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Link to="/login" className="block">
+                        <Button variant="outline" className="w-full">
+                          Login
+                        </Button>
+                      </Link>
+                      <Link to="/signup" className="block">
+                        <Button className="w-full">
+                          Sign Up
+                        </Button>
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
             </SheetContent>

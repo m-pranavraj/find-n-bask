@@ -12,10 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MapPin, Search, Calendar, Filter, Loader2 } from "lucide-react";
+import { Calendar, Filter, Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import PlaceSearch from "@/components/PlaceSearch";
 
 const categories = [
   "All Categories",
@@ -47,24 +48,8 @@ interface FoundItem {
   description: string;
   images: string[];
   created_at: string;
+  status: string;
 }
-
-// Custom input component with icon
-const SearchInput = ({ 
-  icon, 
-  ...props 
-}: { 
-  icon: React.ReactNode 
-} & React.InputHTMLAttributes<HTMLInputElement>) => {
-  return (
-    <div className="relative">
-      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-        {icon}
-      </div>
-      <Input {...props} className={`pl-10 ${props.className}`} />
-    </div>
-  );
-};
 
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
@@ -118,10 +103,6 @@ const SearchLostItems = () => {
     setSearchTerm(e.target.value);
   };
 
-  const handleLocationChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setLocationTerm(e.target.value);
-  };
-
   // Log a search query when user performs a search
   const logSearchQuery = async () => {
     if (!user) return;
@@ -144,7 +125,8 @@ const SearchLostItems = () => {
     try {
       let query = supabase
         .from('found_items')
-        .select('*');
+        .select('*')
+        .eq('status', 'active'); // Only show active items, not claimed or archived
       
       // Apply filters
       if (searchTerm) {
@@ -192,6 +174,9 @@ const SearchLostItems = () => {
         query = query.order('created_at', { ascending: true });
       }
       
+      // Limit to 2 items as requested
+      query = query.limit(2);
+      
       const { data, error } = await query;
       
       if (error) {
@@ -221,7 +206,9 @@ const SearchLostItems = () => {
         const { data, error } = await supabase
           .from('found_items')
           .select('*')
-          .order('created_at', { ascending: false });
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(2); // Limit to 2 items as requested
           
         if (error) {
           throw error;
@@ -261,27 +248,25 @@ const SearchLostItems = () => {
             <div className="bg-card rounded-xl p-6 shadow-sm border border-border mb-10">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="col-span-1 md:col-span-3">
-                  <SearchInput 
-                    placeholder="Search by keywords or description" 
-                    value={searchTerm}
-                    onChange={handleSearchChange}
-                    className="w-full"
-                    icon={<Search className="h-4 w-4" />}
-                  />
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                      <Search className="h-4 w-4" />
+                    </div>
+                    <Input 
+                      placeholder="Search by keywords or description" 
+                      value={searchTerm}
+                      onChange={handleSearchChange}
+                      className="pl-10 w-full"
+                    />
+                  </div>
                 </div>
                 
                 <div className="col-span-1">
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                      <MapPin className="h-4 w-4" />
-                    </div>
-                    <Input 
-                      placeholder="Enter location" 
-                      className="pl-10 w-full"
-                      value={locationTerm}
-                      onChange={handleLocationChange}
-                    />
-                  </div>
+                  <PlaceSearch 
+                    value={locationTerm}
+                    onChange={setLocationTerm}
+                    placeholder="Enter location"
+                  />
                 </div>
                 
                 <div>
@@ -376,7 +361,7 @@ const SearchLostItems = () => {
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
               </div>
             ) : foundItems.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {foundItems.map((item) => (
                   <motion.div
                     key={item.id}
@@ -400,7 +385,6 @@ const SearchLostItems = () => {
                       <h3 className="font-bold text-lg mb-2">{item.item_name}</h3>
                       
                       <div className="flex items-center text-xs text-muted-foreground mb-4">
-                        <MapPin className="w-3 h-3 mr-1" />
                         <span>{item.location}</span>
                         <span className="mx-2">•</span>
                         <Calendar className="w-3 h-3 mr-1" />
@@ -437,15 +421,6 @@ const SearchLostItems = () => {
                   }}
                 >
                   Clear Filters
-                </Button>
-              </div>
-            )}
-            
-            {/* Load more button */}
-            {foundItems.length > 0 && (
-              <div className="mt-10 text-center">
-                <Button variant="outline" size="lg">
-                  Load More Items
                 </Button>
               </div>
             )}

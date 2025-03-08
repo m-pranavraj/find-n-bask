@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Camera, MapPin, Upload, X, Loader2 } from "lucide-react";
+import { Camera, Upload, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +29,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import PlaceSearch from "@/components/PlaceSearch";
 
 const formSchema = z.object({
   itemName: z.string().min(2, {
@@ -66,6 +67,7 @@ const PostFoundItem = () => {
   const { user } = useAuth();
   const [images, setImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [location, setLocation] = useState("");
 
   // Check if user is authenticated
   useQuery({
@@ -123,6 +125,12 @@ const PostFoundItem = () => {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Update location in form when PlaceSearch value changes
+  const handleLocationChange = (value: string) => {
+    setLocation(value);
+    form.setValue("location", value);
+  };
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     // Validate if at least one image is uploaded
     if (images.length === 0) {
@@ -177,7 +185,8 @@ const PostFoundItem = () => {
           location: values.location,
           description: values.description,
           contact_preference: values.contactPreference,
-          images: imageUrls
+          images: imageUrls,
+          status: "active" // New field to track item status (active, claimed, archived)
         });
         
       if (error) {
@@ -273,10 +282,11 @@ const PostFoundItem = () => {
                     <FormItem>
                       <FormLabel>Where did you find it?</FormLabel>
                       <FormControl>
-                        <div className="relative">
-                          <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                          <Input className="pl-10" placeholder="e.g. Waltair Junction, Vizag" {...field} />
-                        </div>
+                        <PlaceSearch 
+                          value={field.value} 
+                          onChange={handleLocationChange}
+                          placeholder="e.g. Waltair Junction, Vizag" 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
