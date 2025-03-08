@@ -1,172 +1,121 @@
 
-import { useEffect, useState } from "react";
+import { useState, ChangeEvent } from "react";
+import { Link } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
-import { MapPin, Calendar, Search } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface LostItem {
-  id: number;
-  name: string;
-  category: string;
-  image: string;
-  description: string;
-  location: string;
-  date: string;
-  isClaimed: boolean;
-}
+import { MapPin, Search, Calendar, Filter } from "lucide-react";
 
 const categories = [
   "All Categories",
-  "Electronics",
-  "Wallets & Purses",
+  "Mobile Phones",
+  "Wallets",
+  "Bags",
   "Keys",
   "Jewelry",
   "Documents",
-  "Bags",
-  "Clothing",
-  "Accessories",
-  "Other"
+  "Electronics",
+  "Others",
 ];
 
-const locations = [
-  "All Locations",
-  "Delhi",
-  "Mumbai",
-  "Bangalore",
-  "Chennai",
-  "Hyderabad",
-  "Kolkata",
-  "Pune",
-  "Ahmedabad",
-  "Jaipur",
-  "Vizag"
-];
-
-const timeFilters = [
-  "All Time",
+const timeframes = [
+  "Any Time",
   "Last 24 Hours",
-  "Last Week",
-  "Last Month",
-  "Last 3 Months"
+  "Last 7 Days",
+  "Last 30 Days",
+  "Last 3 Months",
 ];
 
-const items: LostItem[] = [
+const lostItems = [
   {
     id: 1,
-    name: "iPhone 13 Pro",
-    category: "Electronics",
-    image: "/lovable-uploads/79621265-90bd-40fc-af05-aa7651f40c62.png",
-    description: "Found a black iPhone 13 Pro with a cracked screen protector but the phone is in good condition. No SIM card inside.",
-    location: "Waltair Junction, Vizag",
-    date: "4/15/2025",
-    isClaimed: false
+    title: "iPhone 13 Pro in Blue Silicone Case",
+    category: "Mobile Phones",
+    image: "/lovable-uploads/daea1c8e-f648-4f43-9270-878181903513.png",
+    location: "Andheri Metro Station, Mumbai",
+    date: "2 days ago",
+    description: "iPhone 13 Pro in dark blue case with scratches on the back. Found near platform 2."
   },
   {
     id: 2,
-    name: "Brown Leather Wallet",
-    category: "Wallets & Purses",
+    title: "Brown Leather Wallet",
+    category: "Wallets",
     image: "/lovable-uploads/accf2234-0cbc-4218-8b64-0df3b90e9944.png",
-    description: "Found a brown leather wallet with some cards and cash. No ID visible.",
-    location: "MG Road, Bangalore",
-    date: "4/12/2025",
-    isClaimed: false
+    location: "Connaught Place, Delhi",
+    date: "5 days ago",
+    description: "Small brown leather wallet with initials 'RK' embossed. No cash inside, has some cards."
   },
   {
     id: 3,
-    name: "Car Keys with Honda Remote",
-    category: "Keys",
-    image: "/lovable-uploads/daea1c8e-f648-4f43-9270-878181903513.png",
-    description: "Found a set of car keys with Honda remote and a small keychain.",
-    location: "Jubilee Hills, Hyderabad",
-    date: "4/10/2025",
-    isClaimed: true
+    title: "Gold Chain with Pendant",
+    category: "Jewelry",
+    image: "/lovable-uploads/f82f5865-0de7-428e-ae3c-a8e44a71dc6a.png",
+    location: "Marine Drive, Mumbai",
+    date: "1 week ago",
+    description: "22ct gold chain with small heart-shaped pendant. Found near the jogging track."
   },
   {
     id: 4,
-    name: "Gold Bracelet",
-    category: "Jewelry",
-    image: "/lovable-uploads/9b0f615a-1e67-4b42-8d27-e9664debcab2.png",
-    description: "Found a gold bracelet with floral design near the food court.",
-    location: "Phoenix Mall, Mumbai",
-    date: "4/8/2025",
-    isClaimed: false
+    title: "Dell XPS 13 Laptop",
+    category: "Electronics",
+    image: "/lovable-uploads/85b1a914-74bb-4e9c-9ff0-4f7a539970e6.png",
+    location: "Cyber Hub, Gurgaon",
+    date: "3 days ago",
+    description: "Dell XPS 13 laptop (silver) with stickers on the lid. Found in Cafe Coffee Day."
   },
   {
     id: 5,
-    name: "Passport",
-    category: "Documents",
-    image: "/lovable-uploads/daea1c8e-f648-4f43-9270-878181903513.png",
-    description: "Found an Indian passport near the ticket counter.",
-    location: "Delhi Airport T3",
-    date: "4/5/2025",
-    isClaimed: false
+    title: "Car and House Keys with Red Keychain",
+    category: "Keys",
+    image: "/lovable-uploads/79621265-90bd-40fc-af05-aa7651f40c62.png",
+    location: "Koramangala, Bangalore",
+    date: "Yesterday",
+    description: "Bundle of keys with a distinctive red leather keychain and Honda car key."
   },
   {
     id: 6,
-    name: "Backpack",
-    category: "Bags",
-    image: "/lovable-uploads/85b1a914-74bb-4e9c-9ff0-4f7a539970e6.png",
-    description: "Found a black Wildcraft backpack with some books inside.",
-    location: "Bus Stand, Chennai",
-    date: "4/3/2025",
-    isClaimed: false
+    title: "Prescription Glasses in Black Case",
+    category: "Others",
+    image: "/lovable-uploads/9b0f615a-1e67-4b42-8d27-e9664debcab2.png",
+    location: "Phoenix Mall, Chennai",
+    date: "4 days ago",
+    description: "Black-rimmed prescription glasses in a hard black case. Found in the food court."
   }
 ];
 
-const SearchLostItemsPage = () => {
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
+// Custom input component with icon
+const SearchInput = ({ 
+  icon, 
+  ...props 
+}: { 
+  icon: React.ReactNode 
+} & React.InputHTMLAttributes<HTMLInputElement>) => {
+  return (
+    <div className="relative">
+      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+        {icon}
+      </div>
+      <Input {...props} className={`pl-10 ${props.className}`} />
+    </div>
+  );
+};
 
+const SearchLostItems = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
-  const [selectedLocation, setSelectedLocation] = useState("All Locations");
-  const [selectedTime, setSelectedTime] = useState("All Time");
-  const [filteredItems, setFilteredItems] = useState<LostItem[]>(items);
-  const [activeTab, setActiveTab] = useState("found");
-
-  const handleSearch = () => {
-    let filtered = items;
-    
-    if (searchTerm) {
-      filtered = filtered.filter(item => 
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        item.description.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    if (selectedCategory !== "All Categories") {
-      filtered = filtered.filter(item => item.category === selectedCategory);
-    }
-    
-    if (selectedLocation !== "All Locations") {
-      filtered = filtered.filter(item => item.location.includes(selectedLocation));
-    }
-    
-    // Time filter would need actual date logic in a real app
-    
-    if (activeTab === "found") {
-      filtered = filtered.filter(item => !item.isClaimed);
-    } else {
-      filtered = filtered.filter(item => item.isClaimed);
-    }
-    
-    setFilteredItems(filtered);
-  };
+  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]);
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>(timeframes[0]);
   
-  useEffect(() => {
-    handleSearch();
-  }, [activeTab, searchTerm, selectedCategory, selectedLocation, selectedTime]);
+  const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
 
   return (
     <MainLayout>
@@ -174,49 +123,45 @@ const SearchLostItemsPage = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
+        className="min-h-screen py-24"
       >
-        <section className="pt-20 pb-16 bg-background">
-          <div className="container mx-auto px-4">
-            <div className="text-center max-w-3xl mx-auto mb-12">
-              <h1 className="text-4xl font-bold mb-6">Search Lost & Found Items</h1>
-              <p className="text-lg text-muted-foreground">
-                Looking for something you lost? Search through items that have been found.
-              </p>
-            </div>
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-bold mb-6">Find Your Lost Item</h1>
+            <p className="text-muted-foreground mb-8">
+              Search for items that have been found and reported in your area.
+              Filter by category, location, and time to narrow down your search.
+            </p>
             
-            <Tabs 
-              defaultValue="found"
-              value={activeTab} 
-              onValueChange={setActiveTab}
-              className="w-full max-w-3xl mx-auto mb-8"
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="found">Found Items</TabsTrigger>
-                <TabsTrigger value="claimed">Claimed Items</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
-            <div className="bg-card border border-border rounded-lg p-6 shadow-md max-w-4xl mx-auto mb-12">
-              <h2 className="font-semibold text-xl mb-6">Search Filters</h2>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                <div className="col-span-1 lg:col-span-4">
-                  <Input
-                    placeholder="Search by item name or description"
+            {/* Search filters */}
+            <div className="bg-card rounded-xl p-6 shadow-sm border border-border mb-10">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="col-span-1 md:col-span-3">
+                  <SearchInput 
+                    placeholder="Search by keywords or description" 
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={handleSearchChange}
                     className="w-full"
                     icon={<Search className="h-4 w-4" />}
                   />
                 </div>
                 
+                <div className="col-span-1">
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <Input 
+                      placeholder="Enter location" 
+                      className="pl-10 w-full"
+                    />
+                  </div>
+                </div>
+                
                 <div>
-                  <Select
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
-                  >
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                     <SelectTrigger>
-                      <SelectValue placeholder="All Categories" />
+                      <SelectValue placeholder={selectedCategory} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
@@ -229,120 +174,105 @@ const SearchLostItemsPage = () => {
                 </div>
                 
                 <div>
-                  <Select
-                    value={selectedLocation}
-                    onValueChange={setSelectedLocation}
-                  >
+                  <Select value={selectedTimeframe} onValueChange={setSelectedTimeframe}>
                     <SelectTrigger>
-                      <SelectValue placeholder="All Locations" />
+                      <SelectValue placeholder={selectedTimeframe} />
                     </SelectTrigger>
                     <SelectContent>
-                      {locations.map((location) => (
-                        <SelectItem key={location} value={location}>
-                          {location}
+                      {timeframes.map((timeframe) => (
+                        <SelectItem key={timeframe} value={timeframe}>
+                          {timeframe}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              
+              <div className="mt-6 flex flex-col sm:flex-row justify-between items-center">
+                <Button className="w-full sm:w-auto mb-3 sm:mb-0">
+                  <Search className="mr-2 h-4 w-4" />
+                  Search Items
+                </Button>
                 
-                <div>
-                  <Select
-                    value={selectedTime}
-                    onValueChange={setSelectedTime}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {timeFilters.map((filter) => (
-                        <SelectItem key={filter} value={filter}>
-                          {filter}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Button onClick={handleSearch} className="w-full">
-                    <Search className="mr-2 h-4 w-4" />
-                    Search
-                  </Button>
-                </div>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <Filter className="mr-2 h-4 w-4" />
+                  More Filters
+                </Button>
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {filteredItems.map((item) => (
+            {/* Results */}
+            <div className="mb-6 flex justify-between items-center">
+              <h2 className="text-xl font-medium">Results ({lostItems.length})</h2>
+              <Select defaultValue="newest">
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="relevance">Most Relevant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {lostItems.map((item) => (
                 <motion.div
                   key={item.id}
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
+                  transition={{ duration: 0.3 }}
                   className="bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-md transition-all duration-300"
                 >
-                  <div className="relative h-60 overflow-hidden">
-                    <span className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full">
+                  <div className="relative h-48 overflow-hidden">
+                    <span className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full">
                       {item.category}
                     </span>
-                    {item.isClaimed && (
-                      <span className="absolute top-4 left-4 bg-primary/80 text-primary-foreground backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full">
-                        Claimed
-                      </span>
-                    )}
                     <img
                       src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover object-center transition-transform duration-500 hover:scale-105"
+                      alt={item.title}
+                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                     />
                   </div>
                   
                   <div className="p-5">
-                    <h3 className="font-bold text-lg mb-2">{item.name}</h3>
-                    
-                    <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                      {item.description}
-                    </p>
-                    
-                    <div className="flex items-center text-xs text-muted-foreground mb-2">
-                      <MapPin className="w-3 h-3 mr-1 flex-shrink-0" />
-                      <span className="truncate">{item.location}</span>
-                    </div>
+                    <h3 className="font-bold text-lg mb-2">{item.title}</h3>
                     
                     <div className="flex items-center text-xs text-muted-foreground mb-4">
-                      <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
+                      <MapPin className="w-3 h-3 mr-1" />
+                      <span>{item.location}</span>
+                      <span className="mx-2">•</span>
+                      <Calendar className="w-3 h-3 mr-1" />
                       <span>{item.date}</span>
                     </div>
                     
-                    <Button
-                      variant={item.isClaimed ? "secondary" : "default"}
-                      className="w-full"
-                      disabled={item.isClaimed}
-                    >
-                      {item.isClaimed ? "Already Claimed" : "View Details"}
-                    </Button>
+                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                      {item.description}
+                    </p>
+                    
+                    <Link to={`/item-details/${item.id}`}>
+                      <Button variant="default" className="w-full">
+                        View Details
+                      </Button>
+                    </Link>
                   </div>
                 </motion.div>
               ))}
-
-              {filteredItems.length === 0 && (
-                <div className="col-span-full text-center py-12">
-                  <div className="text-muted-foreground mb-2">
-                    <Search className="h-12 w-12 mx-auto mb-4" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2">No items found</h3>
-                  <p className="text-muted-foreground">
-                    Try adjusting your search filters or check back later.
-                  </p>
-                </div>
-              )}
+            </div>
+            
+            {/* Load more button */}
+            <div className="mt-10 text-center">
+              <Button variant="outline" size="lg">
+                Load More Items
+              </Button>
             </div>
           </div>
-        </section>
+        </div>
       </motion.div>
     </MainLayout>
   );
 };
 
-export default SearchLostItemsPage;
+export default SearchLostItems;
