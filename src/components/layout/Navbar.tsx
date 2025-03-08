@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Menu, X } from "lucide-react";
 import { Logo } from "../ui/logo";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const Navbar = () => {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
@@ -51,6 +52,13 @@ const Navbar = () => {
     { name: "Success Stories", path: "/success-stories" },
   ];
 
+  const isActive = (path: string) => {
+    if (path === "/") {
+      return location.pathname === path;
+    }
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <header 
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -72,7 +80,7 @@ const Navbar = () => {
               key={link.name}
               to={link.path}
               className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-300 hover:bg-accent hover:text-accent-foreground ${
-                location.pathname === link.path
+                isActive(link.path)
                 ? "bg-accent text-accent-foreground"
                 : "text-foreground/80 hover:text-foreground"
               }`}
@@ -99,39 +107,74 @@ const Navbar = () => {
           
           <div className="hidden md:flex items-center space-x-3">
             <Link to="/login">
-              <Button variant="ghost" className="font-medium">
+              <Button 
+                variant={location.pathname === "/login" ? "default" : "ghost"} 
+                className="font-medium"
+              >
                 Login
               </Button>
             </Link>
             <Link to="/signup">
-              <Button variant="default" className="font-medium">
+              <Button 
+                variant={location.pathname === "/signup" ? "secondary" : "default"} 
+                className="font-medium"
+              >
                 Sign Up
               </Button>
             </Link>
           </div>
           
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label="Menu"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </Button>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label="Menu"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between py-4">
+                  <Link to="/" className="flex items-center space-x-2">
+                    <Logo className="h-6 w-6" />
+                    <span className="font-bold">Find & Bask</span>
+                  </Link>
+                </div>
+                
+                <nav className="flex flex-col space-y-1 py-4">
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.name}
+                      to={link.path}
+                      className={`px-4 py-3 rounded-md text-base font-medium transition-colors ${
+                        isActive(link.path)
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-accent hover:text-accent-foreground"
+                      }`}
+                    >
+                      {link.name}
+                    </Link>
+                  ))}
+                </nav>
+                
+                <div className="mt-auto space-y-3 pt-4">
+                  <Link to="/login" className="block">
+                    <Button variant="outline" className="w-full">
+                      Login
+                    </Button>
+                  </Link>
+                  <Link to="/signup" className="block">
+                    <Button className="w-full">
+                      Sign Up
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>

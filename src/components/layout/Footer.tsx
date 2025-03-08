@@ -3,9 +3,13 @@ import { Link } from "react-router-dom";
 import { Logo } from "../ui/logo";
 import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react";
 
-const Footer = () => {
+interface FooterProps {
+  solidBackground?: boolean;
+}
+
+const Footer = ({ solidBackground = false }: FooterProps) => {
   return (
-    <footer className="bg-background border-t border-border mt-auto">
+    <footer className={`${solidBackground ? 'bg-card' : 'bg-background'} border-t border-border mt-auto`}>
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-4">
