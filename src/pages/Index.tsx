@@ -1,13 +1,34 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { useEffect } from "react";
+import MainLayout from "@/components/layout/MainLayout";
+import Hero from "@/components/home/Hero";
+import HowItWorks from "@/components/home/HowItWorks";
+import SuccessStoriesPreview from "@/components/home/SuccessStoriesPreview";
+import FAQ from "@/components/home/FAQ";
+import CTASection from "@/components/home/CTASection";
+import SafetyTips from "@/components/home/SafetyTips";
+import { motion } from "framer-motion";
 
 const Index = () => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
-      </div>
-    </div>
+    <MainLayout>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <Hero />
+        <HowItWorks />
+        <SuccessStoriesPreview />
+        <SafetyTips />
+        <FAQ />
+        <CTASection />
+      </motion.div>
+    </MainLayout>
   );
 };
 
