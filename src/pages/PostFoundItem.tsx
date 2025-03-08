@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Camera, MapPin, Upload, X } from "lucide-react";
+import { Camera, MapPin, Upload, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +26,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import MainLayout from "@/components/layout/MainLayout";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 const formSchema = z.object({
   itemName: z.string().min(2, {
@@ -60,7 +63,22 @@ const categories = [
 
 const PostFoundItem = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [images, setImages] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Check if user is authenticated
+  useQuery({
+    queryKey: ["user-auth-check"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        navigate("/login");
+        toast.error("You must be logged in to post a found item");
+      }
+      return data.user;
+    },
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -105,25 +123,85 @@ const PostFoundItem = () => {
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     // Validate if at least one image is uploaded
     if (images.length === 0) {
       toast.error("Please upload at least one image of the found item");
       return;
     }
 
-    // Here we would normally send data to the backend
-    console.log({ ...values, images });
-    
-    // Show success toast
-    toast.success("Item reported successfully", {
-      description: "Thank you for helping someone find their lost item!",
-    });
+    if (!user) {
+      toast.error("You must be logged in to post a found item");
+      navigate("/login");
+      return;
+    }
 
-    // Redirect to search page
-    setTimeout(() => {
-      navigate("/search-lost-items");
-    }, 1500);
+    try {
+      setIsSubmitting(true);
+      
+      // Save images and get URLs
+      const imageUrls: string[] = [];
+      
+      for (const imageData of images) {
+        // Convert base64 to blob
+        const response = await fetch(imageData);
+        const blob = await response.blob();
+        const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const fileExt = blob.type.split('/')[1];
+        
+        // Upload image to Supabase storage
+        const { data, error } = await supabase.storage
+          .from('found-item-images')
+          .upload(`public/${fileName}.${fileExt}`, blob);
+          
+        if (error) {
+          console.error("Error uploading image:", error);
+          throw error;
+        }
+        
+        // Get URL for the uploaded image
+        const { data: urlData } = supabase.storage
+          .from('found-item-images')
+          .getPublicUrl(`public/${fileName}.${fileExt}`);
+          
+        imageUrls.push(urlData.publicUrl);
+      }
+      
+      // Save found item data to Supabase
+      const { error } = await supabase
+        .from('found_items')
+        .insert({
+          user_id: user.id,
+          item_name: values.itemName,
+          category: values.category,
+          location: values.location,
+          description: values.description,
+          contact_preference: values.contactPreference,
+          images: imageUrls
+        });
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Show success toast
+      toast.success("Item reported successfully", {
+        description: "Thank you for helping someone find their lost item!",
+      });
+
+      // Redirect to search page
+      setTimeout(() => {
+        navigate("/search-lost-items");
+      }, 1500);
+      
+    } catch (error: any) {
+      toast.error("Error submitting item", {
+        description: error.message || "Please try again later.",
+      });
+      console.error("Error submitting found item:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -292,9 +370,18 @@ const PostFoundItem = () => {
                   )}
                 />
 
-                <Button type="submit" className="w-full" size="lg">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Submit Found Item
+                <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Submit Found Item
+                    </>
+                  )}
                 </Button>
               </form>
             </Form>

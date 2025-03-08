@@ -1,11 +1,10 @@
 
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,7 +16,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import MainLayout from "@/components/layout/MainLayout";
-import { EyeIcon, EyeOffIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -39,7 +39,7 @@ const formSchema = z.object({
 });
 
 const SignUp = () => {
-  const navigate = useNavigate();
+  const { signUp, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -54,19 +54,11 @@ const SignUp = () => {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // Here we would normally send data to the backend
-    console.log(values);
-    
-    // Show success toast
-    toast.success("Account created successfully", {
-      description: "Welcome to Find & Bask!",
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    await signUp(values.email, values.password, {
+      name: values.name,
+      phone: values.phone,
     });
-
-    // Redirect to login
-    setTimeout(() => {
-      navigate("/login");
-    }, 1500);
   }
 
   return (
@@ -187,8 +179,15 @@ const SignUp = () => {
                 )}
               />
 
-              <Button type="submit" className="w-full" size="lg">
-                Create Account
+              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
               </Button>
             </form>
           </Form>

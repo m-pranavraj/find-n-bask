@@ -1,5 +1,5 @@
 
-import { useState, ChangeEvent } from "react";
+import { useState, ChangeEvent, useEffect } from "react";
 import { Link } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { motion } from "framer-motion";
@@ -12,18 +12,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MapPin, Search, Calendar, Filter } from "lucide-react";
+import { MapPin, Search, Calendar, Filter, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const categories = [
   "All Categories",
-  "Mobile Phones",
-  "Wallets",
-  "Bags",
+  "Electronics",
+  "Wallets & Purses",
+  "ID Cards",
   "Keys",
   "Jewelry",
-  "Documents",
-  "Electronics",
-  "Others",
+  "Bags",
+  "Clothing",
+  "Books",
+  "Pets",
+  "Other",
 ];
 
 const timeframes = [
@@ -34,62 +39,15 @@ const timeframes = [
   "Last 3 Months",
 ];
 
-const lostItems = [
-  {
-    id: 1,
-    title: "iPhone 13 Pro in Blue Silicone Case",
-    category: "Mobile Phones",
-    image: "/lovable-uploads/daea1c8e-f648-4f43-9270-878181903513.png",
-    location: "Andheri Metro Station, Mumbai",
-    date: "2 days ago",
-    description: "iPhone 13 Pro in dark blue case with scratches on the back. Found near platform 2."
-  },
-  {
-    id: 2,
-    title: "Brown Leather Wallet",
-    category: "Wallets",
-    image: "/lovable-uploads/accf2234-0cbc-4218-8b64-0df3b90e9944.png",
-    location: "Connaught Place, Delhi",
-    date: "5 days ago",
-    description: "Small brown leather wallet with initials 'RK' embossed. No cash inside, has some cards."
-  },
-  {
-    id: 3,
-    title: "Gold Chain with Pendant",
-    category: "Jewelry",
-    image: "/lovable-uploads/f82f5865-0de7-428e-ae3c-a8e44a71dc6a.png",
-    location: "Marine Drive, Mumbai",
-    date: "1 week ago",
-    description: "22ct gold chain with small heart-shaped pendant. Found near the jogging track."
-  },
-  {
-    id: 4,
-    title: "Dell XPS 13 Laptop",
-    category: "Electronics",
-    image: "/lovable-uploads/85b1a914-74bb-4e9c-9ff0-4f7a539970e6.png",
-    location: "Cyber Hub, Gurgaon",
-    date: "3 days ago",
-    description: "Dell XPS 13 laptop (silver) with stickers on the lid. Found in Cafe Coffee Day."
-  },
-  {
-    id: 5,
-    title: "Car and House Keys with Red Keychain",
-    category: "Keys",
-    image: "/lovable-uploads/79621265-90bd-40fc-af05-aa7651f40c62.png",
-    location: "Koramangala, Bangalore",
-    date: "Yesterday",
-    description: "Bundle of keys with a distinctive red leather keychain and Honda car key."
-  },
-  {
-    id: 6,
-    title: "Prescription Glasses in Black Case",
-    category: "Others",
-    image: "/lovable-uploads/9b0f615a-1e67-4b42-8d27-e9664debcab2.png",
-    location: "Phoenix Mall, Chennai",
-    date: "4 days ago",
-    description: "Black-rimmed prescription glasses in a hard black case. Found in the food court."
-  }
-];
+interface FoundItem {
+  id: string;
+  item_name: string;
+  category: string;
+  location: string;
+  description: string;
+  images: string[];
+  created_at: string;
+}
 
 // Custom input component with icon
 const SearchInput = ({ 
@@ -108,14 +66,180 @@ const SearchInput = ({
   );
 };
 
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) {
+    return `${diffInSeconds} seconds ago`;
+  }
+  
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
+  }
+  
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+  }
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) {
+    return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
+  }
+  
+  const diffInWeeks = Math.floor(diffInDays / 7);
+  if (diffInWeeks < 4) {
+    return `${diffInWeeks} ${diffInWeeks === 1 ? 'week' : 'weeks'} ago`;
+  }
+  
+  const diffInMonths = Math.floor(diffInDays / 30);
+  if (diffInMonths < 12) {
+    return `${diffInMonths} ${diffInMonths === 1 ? 'month' : 'months'} ago`;
+  }
+  
+  const diffInYears = Math.floor(diffInDays / 365);
+  return `${diffInYears} ${diffInYears === 1 ? 'year' : 'years'} ago`;
+};
+
 const SearchLostItems = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [locationTerm, setLocationTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]);
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>(timeframes[0]);
+  const [foundItems, setFoundItems] = useState<FoundItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [sortOrder, setSortOrder] = useState("newest");
   
   const handleSearchChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
+
+  const handleLocationChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setLocationTerm(e.target.value);
+  };
+
+  // Log a search query when user performs a search
+  const logSearchQuery = async () => {
+    if (!user) return;
+    
+    try {
+      await supabase.from('lost_item_queries').insert({
+        user_id: user.id,
+        query_text: searchTerm,
+        category: selectedCategory !== "All Categories" ? selectedCategory : null,
+        location: locationTerm,
+        timeframe: selectedTimeframe !== "Any Time" ? selectedTimeframe : null
+      });
+    } catch (error) {
+      console.error("Error logging search query:", error);
+    }
+  };
+
+  const handleSearch = async () => {
+    setIsLoading(true);
+    try {
+      let query = supabase
+        .from('found_items')
+        .select('*');
+      
+      // Apply filters
+      if (searchTerm) {
+        query = query.or(`item_name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+      }
+      
+      if (locationTerm) {
+        query = query.ilike('location', `%${locationTerm}%`);
+      }
+      
+      if (selectedCategory !== "All Categories") {
+        query = query.eq('category', selectedCategory.toLowerCase());
+      }
+      
+      if (selectedTimeframe !== "Any Time") {
+        const now = new Date();
+        let timeAgo;
+        
+        switch (selectedTimeframe) {
+          case "Last 24 Hours":
+            timeAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+            break;
+          case "Last 7 Days":
+            timeAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            break;
+          case "Last 30 Days":
+            timeAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            break;
+          case "Last 3 Months":
+            timeAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
+            break;
+          default:
+            timeAgo = null;
+        }
+        
+        if (timeAgo) {
+          query = query.gte('created_at', timeAgo);
+        }
+      }
+      
+      // Apply sorting
+      if (sortOrder === "newest") {
+        query = query.order('created_at', { ascending: false });
+      } else if (sortOrder === "oldest") {
+        query = query.order('created_at', { ascending: true });
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        throw error;
+      }
+      
+      setFoundItems(data || []);
+      
+      // Log search query to database
+      await logSearchQuery();
+      
+    } catch (error: any) {
+      toast.error("Error searching items", {
+        description: error.message || "Please try again later",
+      });
+      console.error("Error searching items:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('found_items')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        if (error) {
+          throw error;
+        }
+        
+        setFoundItems(data || []);
+      } catch (error: any) {
+        toast.error("Error loading items", {
+          description: error.message || "Please try again later",
+        });
+        console.error("Error loading items:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchInitialData();
+  }, []);
 
   return (
     <MainLayout>
@@ -154,6 +278,8 @@ const SearchLostItems = () => {
                     <Input 
                       placeholder="Enter location" 
                       className="pl-10 w-full"
+                      value={locationTerm}
+                      onChange={handleLocationChange}
                     />
                   </div>
                 </div>
@@ -190,9 +316,22 @@ const SearchLostItems = () => {
               </div>
               
               <div className="mt-6 flex flex-col sm:flex-row justify-between items-center">
-                <Button className="w-full sm:w-auto mb-3 sm:mb-0">
-                  <Search className="mr-2 h-4 w-4" />
-                  Search Items
+                <Button 
+                  className="w-full sm:w-auto mb-3 sm:mb-0"
+                  onClick={handleSearch}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Search Items
+                    </>
+                  )}
                 </Button>
                 
                 <Button variant="outline" className="w-full sm:w-auto">
@@ -204,8 +343,23 @@ const SearchLostItems = () => {
             
             {/* Results */}
             <div className="mb-6 flex justify-between items-center">
-              <h2 className="text-xl font-medium">Results ({lostItems.length})</h2>
-              <Select defaultValue="newest">
+              <h2 className="text-xl font-medium">Results ({foundItems.length})</h2>
+              <Select 
+                defaultValue={sortOrder}
+                onValueChange={(value) => {
+                  setSortOrder(value);
+                  // Re-sort the results when sort order changes
+                  if (value === "newest") {
+                    setFoundItems([...foundItems].sort((a, b) => 
+                      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    ));
+                  } else if (value === "oldest") {
+                    setFoundItems([...foundItems].sort((a, b) => 
+                      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                    ));
+                  }
+                }}
+              >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -217,57 +371,84 @@ const SearchLostItems = () => {
               </Select>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {lostItems.map((item) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-md transition-all duration-300"
-                >
-                  <div className="relative h-48 overflow-hidden">
-                    <span className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full">
-                      {item.category}
-                    </span>
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                    />
-                  </div>
-                  
-                  <div className="p-5">
-                    <h3 className="font-bold text-lg mb-2">{item.title}</h3>
-                    
-                    <div className="flex items-center text-xs text-muted-foreground mb-4">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      <span>{item.location}</span>
-                      <span className="mx-2">•</span>
-                      <Calendar className="w-3 h-3 mr-1" />
-                      <span>{item.date}</span>
+            {isLoading ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              </div>
+            ) : foundItems.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {foundItems.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-card rounded-lg overflow-hidden border border-border shadow-sm hover:shadow-md transition-all duration-300"
+                  >
+                    <div className="relative h-48 overflow-hidden">
+                      <span className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm text-xs font-medium px-2 py-1 rounded-full">
+                        {item.category}
+                      </span>
+                      <img
+                        src={item.images[0] || "/placeholder.svg"}
+                        alt={item.item_name}
+                        className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                      />
                     </div>
                     
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                      {item.description}
-                    </p>
-                    
-                    <Link to={`/item-details/${item.id}`}>
-                      <Button variant="default" className="w-full">
-                        View Details
-                      </Button>
-                    </Link>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                    <div className="p-5">
+                      <h3 className="font-bold text-lg mb-2">{item.item_name}</h3>
+                      
+                      <div className="flex items-center text-xs text-muted-foreground mb-4">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        <span>{item.location}</span>
+                        <span className="mx-2">•</span>
+                        <Calendar className="w-3 h-3 mr-1" />
+                        <span>{formatTimeAgo(item.created_at)}</span>
+                      </div>
+                      
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                        {item.description}
+                      </p>
+                      
+                      <Link to={`/item-details/${item.id}`}>
+                        <Button variant="default" className="w-full">
+                          View Details
+                        </Button>
+                      </Link>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <h3 className="text-xl font-medium mb-2">No items found</h3>
+                <p className="text-muted-foreground mb-8">
+                  Try adjusting your search filters or check back later.
+                </p>
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setLocationTerm("");
+                    setSelectedCategory(categories[0]);
+                    setSelectedTimeframe(timeframes[0]);
+                    handleSearch();
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            )}
             
             {/* Load more button */}
-            <div className="mt-10 text-center">
-              <Button variant="outline" size="lg">
-                Load More Items
-              </Button>
-            </div>
+            {foundItems.length > 0 && (
+              <div className="mt-10 text-center">
+                <Button variant="outline" size="lg">
+                  Load More Items
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
