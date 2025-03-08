@@ -1,82 +1,96 @@
 
-import { useState, useEffect } from "react";
-import MainLayout from "@/components/layout/MainLayout";
-import { motion } from "framer-motion";
-import { toast } from "sonner";
-import { z } from "zod";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button } from "@/components/ui/button";
+import { z } from "zod";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Camera, LogOut, User as UserIcon, Bookmark } from "lucide-react";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { Loader2, MapPin, Search } from "lucide-react";
+import MainLayout from "@/components/layout/MainLayout";
+import { useQuery } from "@tanstack/react-query";
 
 const profileFormSchema = z.object({
-  full_name: z.string().min(2, {
+  fullName: z.string().min(2, {
     message: "Name must be at least 2 characters.",
   }),
   email: z.string().email({
     message: "Please enter a valid email address.",
-  }),
+  }).optional(),
   phone: z.string().min(10, {
-    message: "Phone number must be at least 10 digits.",
-  }).nullish(),
-  location: z.string().min(3, {
-    message: "Please enter a valid location.",
-  }).nullish(),
-  bio: z.string().max(500, {
-    message: "Bio cannot exceed 500 characters.",
-  }).nullish(),
+    message: "Please enter a valid phone number.",
+  }).optional(),
+  location: z.string().min(2, {
+    message: "Location must be at least 2 characters.",
+  }).optional(),
+  bio: z.string().max(240, {
+    message: "Bio cannot be longer than 240 characters.",
+  }).optional(),
 });
 
-interface FoundItem {
-  id: string;
-  item_name: string;
-  category: string;
-  location: string;
-  description: string;
-  images: string[];
-  created_at: string;
-}
+const securityFormSchema = z.object({
+  currentPassword: z.string().min(8, {
+    message: "Password must be at least 8 characters.",
+  }),
+  newPassword: z.string().min(8, {
+    message: "Password must be at least 8 characters.",
+  }),
+  confirmPassword: z.string().min(8, {
+    message: "Password must be at least 8 characters.",
+  }),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
 
-interface SearchQuery {
-  id: string;
-  query_text: string;
-  category: string | null;
-  location: string | null;
-  timeframe: string | null;
-  created_at: string;
-}
+const notificationFormSchema = z.object({
+  emailNotifications: z.boolean().default(true),
+  smsNotifications: z.boolean().default(false),
+  appNotifications: z.boolean().default(true),
+});
 
 const UserProfile = () => {
   const { user, signOut } = useAuth();
+  const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [foundItems, setFoundItems] = useState<FoundItem[]>([]);
-  const [searchQueries, setSearchQueries] = useState<SearchQuery[]>([]);
+  const [userData, setUserData] = useState(null);
 
-  const form = useForm<z.infer<typeof profileFormSchema>>({
+  const { data: profileData } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+    onSuccess: (data) => {
+      setUserData(data);
+      setIsLoading(false);
+    },
+    onError: (error) => {
+      console.error("Error fetching profile:", error);
+      toast.error("Failed to load profile data");
+      setIsLoading(false);
+    }
+  });
+
+  const profileForm = useForm({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      full_name: "",
+      fullName: "",
       email: "",
       phone: "",
       location: "",
@@ -84,174 +98,137 @@ const UserProfile = () => {
     },
   });
 
+  const securityForm = useForm({
+    resolver: zodResolver(securityFormSchema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  });
+
+  const notificationForm = useForm({
+    resolver: zodResolver(notificationFormSchema),
+    defaultValues: {
+      emailNotifications: true,
+      smsNotifications: false,
+      appNotifications: true,
+    },
+  });
+
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      setIsLoading(true);
-      try {
-        if (!user) {
-          throw new Error("User not authenticated");
-        }
-
-        // Fetch user profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (profileError) {
-          throw profileError;
-        }
-
-        // Set form values
-        form.reset({
-          full_name: profile.full_name || "",
-          email: profile.email || "",
-          phone: profile.phone || "",
-          location: profile.location || "",
-          bio: profile.bio || "",
-        });
-
-        setAvatarUrl(profile.avatar_url);
-
-        // Fetch user's found items
-        const { data: items, error: itemsError } = await supabase
-          .from('found_items')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (itemsError) {
-          console.error("Error fetching found items:", itemsError);
-        } else {
-          setFoundItems(items || []);
-        }
-
-        // Fetch user's search queries
-        const { data: queries, error: queriesError } = await supabase
-          .from('lost_item_queries')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (queriesError) {
-          console.error("Error fetching search queries:", queriesError);
-        } else {
-          setSearchQueries(queries || []);
-        }
-
-      } catch (error: any) {
-        toast.error("Error loading profile", {
-          description: error.message,
-        });
-        console.error("Error loading profile:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserProfile();
-  }, [user, form]);
-
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    // Only accept images
-    if (!file.type.startsWith("image/")) {
-      toast.error("Only image files are allowed");
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-
-      // Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      const avatarUrl = urlData.publicUrl;
-
-      // Update profile
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: avatarUrl })
-        .eq('id', user.id);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      setAvatarUrl(avatarUrl);
-      toast.success("Avatar updated successfully");
-
-    } catch (error: any) {
-      toast.error("Error uploading avatar", {
-        description: error.message,
+    if (profileData) {
+      profileForm.reset({
+        fullName: profileData.full_name || "",
+        email: user?.email || "",
+        phone: profileData.phone || "",
+        location: profileData.location || "",
+        bio: profileData.bio || "",
       });
-      console.error("Error uploading avatar:", error);
-    } finally {
-      setIsUploading(false);
+      
+      if (profileData.notification_preferences) {
+        const preferences = profileData.notification_preferences;
+        notificationForm.reset({
+          emailNotifications: preferences.email || true,
+          smsNotifications: preferences.sms || false,
+          appNotifications: preferences.app || true,
+        });
+      }
     }
-  };
+  }, [profileData, user, profileForm, notificationForm]);
 
-  const onSubmit = async (values: z.infer<typeof profileFormSchema>) => {
-    if (!user) return;
-
+  const onProfileSubmit = async (data) => {
     try {
-      setIsSaving(true);
-
+      setIsUpdating(true);
+      
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({
-          full_name: values.full_name,
-          phone: values.phone,
-          location: values.location,
-          bio: values.bio,
+          full_name: data.fullName,
+          phone: data.phone,
+          location: data.location,
+          bio: data.bio,
+          updated_at: new Date(),
         })
-        .eq('id', user.id);
-
-      if (error) {
-        throw error;
-      }
-
+        .eq("id", user.id);
+      
+      if (error) throw error;
+      
       toast.success("Profile updated successfully");
-    } catch (error: any) {
-      toast.error("Error updating profile", {
-        description: error.message,
-      });
+    } catch (error) {
       console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
     } finally {
-      setIsSaving(false);
+      setIsUpdating(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  const onSecuritySubmit = async (data) => {
+    try {
+      setIsUpdating(true);
+      
+      const { error } = await supabase.auth.updateUser({
+        password: data.newPassword,
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Password updated successfully");
+      securityForm.reset({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (error) {
+      console.error("Error updating password:", error);
+      toast.error("Failed to update password");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const onNotificationSubmit = async (data) => {
+    try {
+      setIsUpdating(true);
+      
+      const preferences = {
+        email: data.emailNotifications,
+        sms: data.smsNotifications,
+        app: data.appNotifications,
+      };
+      
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          notification_preferences: preferences,
+          updated_at: new Date(),
+        })
+        .eq("id", user.id);
+      
+      if (error) throw error;
+      
+      toast.success("Notification preferences updated");
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      toast.error("Failed to update notification preferences");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   if (isLoading) {
     return (
       <MainLayout>
-        <div className="min-h-screen flex items-center justify-center py-24">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <div className="container mx-auto px-4 py-12 flex justify-center items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </MainLayout>
     );
@@ -259,316 +236,314 @@ const UserProfile = () => {
 
   return (
     <MainLayout>
-      <div className="container mx-auto py-16 px-4">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-              <h1 className="text-3xl font-bold mb-4 md:mb-0">Your Profile</h1>
-              <Button variant="outline" onClick={() => signOut()}>
-                <LogOut className="mr-2 h-4 w-4" />
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row md:items-start gap-8 mb-8">
+          <Card className="w-full md:w-80 shrink-0">
+            <CardHeader>
+              <div className="flex items-center gap-4">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <span className="text-2xl font-semibold">
+                    {userData?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                  </span>
+                </div>
+                <div>
+                  <CardTitle>{userData?.full_name || "User"}</CardTitle>
+                  <CardDescription>{user?.email}</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {userData?.location && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>{userData.location}</span>
+                </div>
+              )}
+              {userData?.bio && (
+                <p className="text-sm">{userData.bio}</p>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button variant="outline" className="w-full" onClick={handleSignOut}>
                 Sign Out
               </Button>
-            </div>
+            </CardFooter>
+          </Card>
+          
+          <div className="flex-1">
+            <Tabs defaultValue="profile" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 mb-8">
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+                <TabsTrigger value="security">Security</TabsTrigger>
+                <TabsTrigger value="notifications">Notifications</TabsTrigger>
+              </TabsList>
 
-            <div className="bg-card border border-border rounded-xl p-6 md:p-8 mb-8">
-              <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
-                <div className="relative">
-                  <div className="h-32 w-32 rounded-full bg-accent flex items-center justify-center overflow-hidden">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt="User avatar"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <UserIcon className="h-16 w-16 text-muted-foreground" />
-                    )}
-                  </div>
-                  <label
-                    htmlFor="avatar-upload"
-                    className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer"
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4" />
-                    )}
-                  </label>
-                  <input
-                    id="avatar-upload"
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarUpload}
-                    disabled={isUploading}
-                  />
-                </div>
-
-                <div className="flex-1 w-full">
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <TabsContent value="profile">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Profile Information</CardTitle>
+                    <CardDescription>
+                      Update your profile information. This information may be visible to others.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...profileForm}>
+                      <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
                         <FormField
-                          control={form.control}
-                          name="full_name"
+                          control={profileForm.control}
+                          name="fullName"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Full Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="Your name" {...field} />
+                                <Input {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-
                         <FormField
-                          control={form.control}
+                          control={profileForm.control}
                           name="email"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Email</FormLabel>
                               <FormControl>
-                                <Input
-                                  type="email"
-                                  placeholder="your@email.com"
-                                  disabled
-                                  {...field}
-                                />
+                                <Input {...field} disabled />
                               </FormControl>
+                              <FormDescription>
+                                Email cannot be changed. Contact support for assistance.
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-
                         <FormField
-                          control={form.control}
+                          control={profileForm.control}
                           name="phone"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Phone Number</FormLabel>
                               <FormControl>
-                                <Input
-                                  type="tel"
-                                  placeholder="+91 98765 43210"
-                                  {...field}
-                                  value={field.value || ""}
-                                />
+                                <Input {...field} type="tel" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-
                         <FormField
-                          control={form.control}
+                          control={profileForm.control}
                           name="location"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Location</FormLabel>
+                              <div className="relative">
+                                <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <FormControl>
+                                  <Input {...field} className="pl-10" />
+                                </FormControl>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={profileForm.control}
+                          name="bio"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Bio</FormLabel>
                               <FormControl>
-                                <Input
-                                  placeholder="Mumbai, India"
+                                <Textarea 
                                   {...field}
-                                  value={field.value || ""}
+                                  rows={4}
+                                  placeholder="Tell us a little about yourself"
                                 />
+                              </FormControl>
+                              <FormDescription>
+                                Maximum 240 characters.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button type="submit" disabled={isUpdating}>
+                          {isUpdating ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : "Save Changes"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="security">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Security Settings</CardTitle>
+                    <CardDescription>
+                      Update your password and security settings.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...securityForm}>
+                      <form onSubmit={securityForm.handleSubmit(onSecuritySubmit)} className="space-y-6">
+                        <FormField
+                          control={securityForm.control}
+                          name="currentPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Current Password</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="password" />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </div>
-
-                      <FormField
-                        control={form.control}
-                        name="bio"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Bio</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Tell us a bit about yourself"
-                                className="min-h-[100px]"
-                                {...field}
-                                value={field.value || ""}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <Button type="submit" disabled={isSaving}>
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          "Save Changes"
-                        )}
-                      </Button>
-                    </form>
-                  </Form>
-                </div>
-              </div>
-            </div>
-
-            <Tabs defaultValue="found_items">
-              <TabsList className="mb-6">
-                <TabsTrigger value="found_items">
-                  <Camera className="mr-2 h-4 w-4" />
-                  Items You Found
-                </TabsTrigger>
-                <TabsTrigger value="searches">
-                  <Bookmark className="mr-2 h-4 w-4" />
-                  Your Searches
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="found_items">
-                <div className="bg-card border border-border rounded-xl p-6 md:p-8">
-                  <h2 className="text-xl font-bold mb-6">Items You've Found</h2>
-                  
-                  {foundItems.length > 0 ? (
-                    <div className="space-y-6">
-                      {foundItems.map((item) => (
-                        <div 
-                          key={item.id} 
-                          className="flex flex-col md:flex-row gap-4 border-b border-border pb-6 last:border-0 last:pb-0"
-                        >
-                          <div className="h-24 w-24 md:h-32 md:w-32 rounded-md overflow-hidden bg-accent flex-shrink-0">
-                            {item.images && item.images.length > 0 ? (
-                              <img
-                                src={item.images[0]}
-                                alt={item.item_name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                                No Image
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-2">
-                              <h3 className="font-bold text-lg">{item.item_name}</h3>
-                              <span className="text-sm text-muted-foreground">
-                                Posted on {formatDate(item.created_at)}
-                              </span>
-                            </div>
-                            
-                            <div className="flex items-center text-sm text-muted-foreground mb-3">
-                              <span className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full mr-3">
-                                {item.category}
-                              </span>
-                              <MapPin className="h-3 w-3 mr-1" />
-                              <span>{item.location}</span>
-                            </div>
-                            
-                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                              {item.description}
-                            </p>
-                            
-                            <div className="flex flex-wrap gap-2">
-                              <Button variant="outline" size="sm" asChild>
-                                <a href={`/item-details/${item.id}`}>View Details</a>
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                Mark as Claimed
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10">
-                      <p className="text-muted-foreground">
-                        You haven't reported any found items yet.
-                      </p>
-                      <Button className="mt-4" asChild>
-                        <a href="/post-found-item">Report a Found Item</a>
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                        <FormField
+                          control={securityForm.control}
+                          name="newPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>New Password</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={securityForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm New Password</FormLabel>
+                              <FormControl>
+                                <Input {...field} type="password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button type="submit" disabled={isUpdating}>
+                          {isUpdating ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : "Update Password"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
               </TabsContent>
-              
-              <TabsContent value="searches">
-                <div className="bg-card border border-border rounded-xl p-6 md:p-8">
-                  <h2 className="text-xl font-bold mb-6">Your Recent Searches</h2>
-                  
-                  {searchQueries.length > 0 ? (
-                    <div className="space-y-4">
-                      {searchQueries.map((query) => (
-                        <div 
-                          key={query.id} 
-                          className="p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors"
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-medium">{query.query_text || "No search term"}</h3>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(query.created_at)}
-                            </span>
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-2 text-xs">
-                            {query.category && (
-                              <span className="bg-primary/10 text-primary px-2 py-1 rounded-full">
-                                {query.category}
-                              </span>
-                            )}
-                            
-                            {query.location && (
-                              <span className="bg-accent text-accent-foreground px-2 py-1 rounded-full flex items-center">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                {query.location}
-                              </span>
-                            )}
-                            
-                            {query.timeframe && (
-                              <span className="bg-accent text-accent-foreground px-2 py-1 rounded-full">
-                                {query.timeframe}
-                              </span>
-                            )}
-                          </div>
-                          
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="mt-3"
-                            onClick={() => {
-                              // Implement re-run search functionality
-                              window.location.href = `/search-lost-items?query=${encodeURIComponent(query.query_text || "")}${query.category ? `&category=${encodeURIComponent(query.category)}` : ""}${query.location ? `&location=${encodeURIComponent(query.location)}` : ""}${query.timeframe ? `&timeframe=${encodeURIComponent(query.timeframe)}` : ""}`;
-                            }}
-                          >
-                            <Search className="h-3 w-3 mr-1" />
-                            Search Again
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-10">
-                      <p className="text-muted-foreground">
-                        You haven't made any searches yet.
-                      </p>
-                      <Button className="mt-4" asChild>
-                        <a href="/search-lost-items">Search Lost Items</a>
-                      </Button>
-                    </div>
-                  )}
-                </div>
+
+              <TabsContent value="notifications">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Notification Preferences</CardTitle>
+                    <CardDescription>
+                      Control how and when you receive notifications.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...notificationForm}>
+                      <form onSubmit={notificationForm.handleSubmit(onNotificationSubmit)} className="space-y-6">
+                        <FormField
+                          control={notificationForm.control}
+                          name="emailNotifications"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  Email Notifications
+                                </FormLabel>
+                                <FormDescription>
+                                  Receive notifications via email.
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <input
+                                  type="checkbox"
+                                  checked={field.value}
+                                  onChange={field.onChange}
+                                  className="toggle"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={notificationForm.control}
+                          name="smsNotifications"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  SMS Notifications
+                                </FormLabel>
+                                <FormDescription>
+                                  Receive notifications via text message.
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <input
+                                  type="checkbox"
+                                  checked={field.value}
+                                  onChange={field.onChange}
+                                  className="toggle"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={notificationForm.control}
+                          name="appNotifications"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                              <div className="space-y-0.5">
+                                <FormLabel className="text-base">
+                                  In-App Notifications
+                                </FormLabel>
+                                <FormDescription>
+                                  Receive notifications within the application.
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <input
+                                  type="checkbox"
+                                  checked={field.value}
+                                  onChange={field.onChange}
+                                  className="toggle"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <Button type="submit" disabled={isUpdating}>
+                          {isUpdating ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Updating...
+                            </>
+                          ) : "Save Preferences"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>
-        </motion.div>
+        </div>
       </div>
     </MainLayout>
   );
