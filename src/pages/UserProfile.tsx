@@ -12,6 +12,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
+interface NotificationPreferences {
+  email: boolean;
+  sms: boolean;
+  app: boolean;
+}
+
 interface Profile {
   id: string;
   full_name: string | null;
@@ -20,11 +26,7 @@ interface Profile {
   bio: string | null;
   phone: string | null;
   location: string | null;
-  notification_preferences: {
-    email: boolean;
-    sms: boolean;
-    app: boolean;
-  } | null;
+  notification_preferences: NotificationPreferences | null;
 }
 
 const UserProfile = () => {
@@ -57,8 +59,28 @@ const UserProfile = () => {
           
         if (error) throw error;
         
-        // Initialize the profile state
-        setProfile(data);
+        // Parse notification_preferences from JSON if needed
+        let notificationPrefs: NotificationPreferences = { email: false, sms: false, app: false };
+        
+        if (data.notification_preferences) {
+          if (typeof data.notification_preferences === 'string') {
+            // If it's a string, try to parse it
+            try {
+              notificationPrefs = JSON.parse(data.notification_preferences);
+            } catch (e) {
+              console.error("Error parsing notification preferences:", e);
+            }
+          } else {
+            // If it's already an object
+            notificationPrefs = data.notification_preferences as NotificationPreferences;
+          }
+        }
+        
+        // Initialize the profile state with properly typed notification_preferences
+        setProfile({
+          ...data,
+          notification_preferences: notificationPrefs
+        });
         
         // Initialize the form state
         setFormData({
@@ -66,9 +88,9 @@ const UserProfile = () => {
           bio: data.bio || "",
           location: data.location || "",
           phone: data.phone || "",
-          notification_email: data.notification_preferences?.email || false,
-          notification_sms: data.notification_preferences?.sms || false,
-          notification_app: data.notification_preferences?.app || false
+          notification_email: notificationPrefs?.email || false,
+          notification_sms: notificationPrefs?.sms || false,
+          notification_app: notificationPrefs?.app || false
         });
       } catch (error) {
         console.error("Error fetching profile:", error);
