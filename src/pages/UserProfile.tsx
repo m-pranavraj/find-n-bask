@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,13 +65,18 @@ const UserProfile = () => {
           if (typeof data.notification_preferences === 'string') {
             // If it's a string, try to parse it
             try {
-              notificationPrefs = JSON.parse(data.notification_preferences);
+              notificationPrefs = JSON.parse(data.notification_preferences as string);
             } catch (e) {
               console.error("Error parsing notification preferences:", e);
             }
-          } else {
-            // If it's already an object
-            notificationPrefs = data.notification_preferences as NotificationPreferences;
+          } else if (data.notification_preferences && typeof data.notification_preferences === 'object') {
+            // Safely cast to NotificationPreferences with default values for missing properties
+            const np = data.notification_preferences as Record<string, unknown>;
+            notificationPrefs = {
+              email: typeof np.email === 'boolean' ? np.email : false,
+              sms: typeof np.sms === 'boolean' ? np.sms : false,
+              app: typeof np.app === 'boolean' ? np.app : false
+            };
           }
         }
         
@@ -88,9 +92,9 @@ const UserProfile = () => {
           bio: data.bio || "",
           location: data.location || "",
           phone: data.phone || "",
-          notification_email: notificationPrefs?.email || false,
-          notification_sms: notificationPrefs?.sms || false,
-          notification_app: notificationPrefs?.app || false
+          notification_email: notificationPrefs.email,
+          notification_sms: notificationPrefs.sms,
+          notification_app: notificationPrefs.app
         });
       } catch (error) {
         console.error("Error fetching profile:", error);
