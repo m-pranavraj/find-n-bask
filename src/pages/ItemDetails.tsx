@@ -34,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import ClaimVerification from "@/components/ClaimVerification";
+import ChatInterface from "@/components/ChatInterface";
 
 interface FoundItem {
   id: string;
@@ -62,6 +63,7 @@ interface ItemClaim {
   owner_description: string;
   status: 'pending' | 'approved' | 'rejected' | 'completed';
   created_at: string;
+  updated_at: string;
 }
 
 const formatTimeAgo = (dateString: string) => {
@@ -172,7 +174,13 @@ const ItemDetails = () => {
           if (claimsError) {
             console.error("Error fetching claims:", claimsError);
           } else {
-            setClaims(claimsData || []);
+            // Type assertion for the status field
+            const typedClaimsData = claimsData?.map(claim => ({
+              ...claim,
+              status: claim.status as 'pending' | 'approved' | 'rejected' | 'completed'
+            })) || [];
+            
+            setClaims(typedClaimsData);
           }
         }
         
@@ -188,7 +196,11 @@ const ItemDetails = () => {
           if (userClaimError && userClaimError.code !== 'PGRST116') { // PGRST116 is "no rows found"
             console.error("Error fetching user claim:", userClaimError);
           } else if (userClaimData) {
-            setUserClaim(userClaimData);
+            // Type assertion for the status field
+            setUserClaim({
+              ...userClaimData,
+              status: userClaimData.status as 'pending' | 'approved' | 'rejected' | 'completed'
+            });
           }
         }
         
@@ -300,7 +312,13 @@ const ItemDetails = () => {
         .eq('item_id', id)
         .order('created_at', { ascending: false });
         
-      setClaims(updatedClaims || []);
+      // Type assertion for the status field
+      const typedClaimsData = updatedClaims?.map(claim => ({
+        ...claim,
+        status: claim.status as 'pending' | 'approved' | 'rejected' | 'completed'
+      })) || [];
+      
+      setClaims(typedClaimsData);
       
       toast.success(
         action === 'approve' 
@@ -383,6 +401,9 @@ const ItemDetails = () => {
   const isItemActive = item.status === 'active';
   const isItemClaimed = item.status === 'claimed';
   const isItemCompleted = item.status === 'completed';
+
+  // Find the approved claim for chat functionality
+  const approvedClaim = claims.find(claim => claim.status === 'approved');
 
   return (
     <MainLayout>
@@ -529,6 +550,18 @@ const ItemDetails = () => {
                     </div>
                   </div>
                 </div>
+                
+                {/* Chat Interface - Show when there's an approved claim */}
+                {(userClaim?.status === 'approved' || (isFinderUser && approvedClaim)) && (
+                  <div className="mb-8">
+                    <h2 className="text-lg font-medium mb-4">Messages</h2>
+                    <ChatInterface 
+                      itemId={item.id} 
+                      recipientId={isFinderUser ? approvedClaim?.claimer_id || '' : item.user_id}
+                      claimId={isFinderUser ? approvedClaim?.id || '' : userClaim?.id || ''}
+                    />
+                  </div>
+                )}
                 
                 {/* Item status actions */}
                 {isFinderUser && isItemClaimed && (
