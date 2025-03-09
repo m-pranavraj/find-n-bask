@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import MainLayout from "@/components/layout/MainLayout";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ import {
   AlertCircle,
   Mail,
   Phone,
+  CheckCircle2,
+  XCircle,
+  Clock
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -30,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import ClaimVerification from "@/components/ClaimVerification";
 
 interface FoundItem {
   id: string;
@@ -41,6 +45,7 @@ interface FoundItem {
   contact_preference: string;
   images: string[];
   created_at: string;
+  status: string;
 }
 
 interface UserProfile {
@@ -48,6 +53,15 @@ interface UserProfile {
   full_name: string | null;
   email: string | null;
   phone: string | null;
+}
+
+interface ItemClaim {
+  id: string;
+  item_id: string;
+  claimer_id: string;
+  owner_description: string;
+  status: 'pending' | 'approved' | 'rejected' | 'completed';
+  created_at: string;
 }
 
 const formatTimeAgo = (dateString: string) => {
@@ -91,6 +105,7 @@ const formatTimeAgo = (dateString: string) => {
 const ItemDetails = () => {
   const { id } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   
   const [item, setItem] = useState<FoundItem | null>(null);
   const [finderProfile, setFinderProfile] = useState<UserProfile | null>(null);
@@ -99,7 +114,14 @@ const ItemDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
-
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claims, setClaims] = useState<ItemClaim[]>([]);
+  const [userClaim, setUserClaim] = useState<ItemClaim | null>(null);
+  const [isFinderUser, setIsFinderUser] = useState(false);
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isHandoverDialogOpen, setIsHandoverDialogOpen] = useState(false);
+  
   useEffect(() => {
     const fetchItemDetails = async () => {
       setIsLoading(true);
@@ -124,6 +146,7 @@ const ItemDetails = () => {
         }
         
         setItem(itemData);
+        setIsFinderUser(user?.id === itemData.user_id);
         
         // Fetch finder's profile
         const { data: profileData, error: profileError } = await supabase
@@ -138,6 +161,37 @@ const ItemDetails = () => {
           setFinderProfile(profileData);
         }
         
+        // If the user is the finder, fetch all claims for this item
+        if (user?.id === itemData.user_id) {
+          const { data: claimsData, error: claimsError } = await supabase
+            .from('item_claims')
+            .select('*')
+            .eq('item_id', id)
+            .order('created_at', { ascending: false });
+            
+          if (claimsError) {
+            console.error("Error fetching claims:", claimsError);
+          } else {
+            setClaims(claimsData || []);
+          }
+        }
+        
+        // If the user is not the finder, check if they have a claim for this item
+        if (user && user.id !== itemData.user_id) {
+          const { data: userClaimData, error: userClaimError } = await supabase
+            .from('item_claims')
+            .select('*')
+            .eq('item_id', id)
+            .eq('claimer_id', user.id)
+            .single();
+            
+          if (userClaimError && userClaimError.code !== 'PGRST116') { // PGRST116 is "no rows found"
+            console.error("Error fetching user claim:", userClaimError);
+          } else if (userClaimData) {
+            setUserClaim(userClaimData);
+          }
+        }
+        
       } catch (err: any) {
         console.error("Error fetching item details:", err);
         setError(err.message || "Failed to load item details");
@@ -150,7 +204,7 @@ const ItemDetails = () => {
     };
     
     fetchItemDetails();
-  }, [id]);
+  }, [id, user]);
 
   const handleNextImage = () => {
     if (item && activeImageIndex < item.images.length - 1) {
@@ -208,6 +262,96 @@ const ItemDetails = () => {
       setIsSending(false);
     }
   };
+  
+  const handleReviewClaim = (claimId: string) => {
+    setSelectedClaimId(claimId);
+    setIsReviewDialogOpen(true);
+  };
+  
+  const handleClaimAction = async (action: 'approve' | 'reject') => {
+    if (!selectedClaimId) return;
+    
+    try {
+      // Update the claim status
+      const { error } = await supabase
+        .from('item_claims')
+        .update({ 
+          status: action === 'approve' ? 'approved' : 'rejected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedClaimId);
+        
+      if (error) throw error;
+      
+      // If approved, update the item status
+      if (action === 'approve') {
+        const { error: itemError } = await supabase
+          .from('found_items')
+          .update({ status: 'claimed' })
+          .eq('id', id);
+          
+        if (itemError) throw itemError;
+      }
+      
+      // Refresh claims
+      const { data: updatedClaims } = await supabase
+        .from('item_claims')
+        .select('*')
+        .eq('item_id', id)
+        .order('created_at', { ascending: false });
+        
+      setClaims(updatedClaims || []);
+      
+      toast.success(
+        action === 'approve' 
+          ? "Claim approved successfully" 
+          : "Claim rejected successfully"
+      );
+      
+      setIsReviewDialogOpen(false);
+    } catch (error: any) {
+      toast.error("Error updating claim", {
+        description: error.message || "Please try again later"
+      });
+    }
+  };
+  
+  const handleMarkCompleted = async () => {
+    if (!id) return;
+    
+    try {
+      // Update the found item status
+      const { error: itemError } = await supabase
+        .from('found_items')
+        .update({ status: 'completed' })
+        .eq('id', id);
+        
+      if (itemError) throw itemError;
+      
+      // Update any approved claims to completed
+      const { error: claimsError } = await supabase
+        .from('item_claims')
+        .update({ status: 'completed' })
+        .eq('item_id', id)
+        .eq('status', 'approved');
+        
+      if (claimsError) throw claimsError;
+      
+      toast.success("Item marked as returned to owner", {
+        description: "Thank you for helping someone find their lost item!"
+      });
+      
+      // Refresh the page data
+      setTimeout(() => {
+        navigate(0); // Refresh the page
+      }, 1500);
+      
+    } catch (error: any) {
+      toast.error("Error updating item status", {
+        description: error.message || "Please try again later"
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -235,6 +379,10 @@ const ItemDetails = () => {
       </MainLayout>
     );
   }
+  
+  const isItemActive = item.status === 'active';
+  const isItemClaimed = item.status === 'claimed';
+  const isItemCompleted = item.status === 'completed';
 
   return (
     <MainLayout>
@@ -321,7 +469,29 @@ const ItemDetails = () => {
             <div>
               <div className="bg-card rounded-xl border border-border p-6 md:p-8 shadow-sm">
                 <div className="flex justify-between items-start mb-4">
-                  <h1 className="text-2xl md:text-3xl font-bold">{item.item_name}</h1>
+                  <div>
+                    <h1 className="text-2xl md:text-3xl font-bold">{item.item_name}</h1>
+                    <div className="flex items-center mt-2">
+                      {item.status === 'active' && (
+                        <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full flex items-center">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Active
+                        </span>
+                      )}
+                      {item.status === 'claimed' && (
+                        <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full flex items-center">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Claimed - Pending Handover
+                        </span>
+                      )}
+                      {item.status === 'completed' && (
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Returned to Owner
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <Button variant="ghost" size="icon" onClick={handleShare}>
                     <Share2 className="h-5 w-5" />
                   </Button>
@@ -360,77 +530,166 @@ const ItemDetails = () => {
                   </div>
                 </div>
                 
+                {/* Item status actions */}
+                {isFinderUser && isItemClaimed && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                    <h3 className="font-medium flex items-center text-yellow-800">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Item Claimed - Pending Handover
+                    </h3>
+                    <p className="text-sm text-yellow-700 mt-1 mb-3">
+                      After you've returned the item to its owner, mark the process as complete.
+                    </p>
+                    <Button 
+                      onClick={() => setIsHandoverDialogOpen(true)} 
+                      variant="outline" 
+                      className="w-full border-yellow-300 bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Mark as Returned to Owner
+                    </Button>
+                  </div>
+                )}
+                
+                {isFinderUser && isItemActive && claims.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <h3 className="font-medium flex items-center text-blue-800">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      {claims.length} {claims.length === 1 ? 'person has' : 'people have'} claimed this item
+                    </h3>
+                    <p className="text-sm text-blue-700 mt-1 mb-3">
+                      Review the claims and approve the one that matches the item's description.
+                    </p>
+                    <div className="space-y-2">
+                      {claims.map(claim => (
+                        <Button 
+                          key={claim.id}
+                          onClick={() => handleReviewClaim(claim.id)} 
+                          variant="outline" 
+                          className="w-full border-blue-300 bg-blue-100 text-blue-800 hover:bg-blue-200"
+                        >
+                          Review Claim #{claim.id.slice(0, 8)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {isItemCompleted && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <h3 className="font-medium flex items-center text-green-800">
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      This item has been returned to its owner
+                    </h3>
+                    <p className="text-sm text-green-700 mt-1">
+                      Great job! Thanks for helping someone find their lost item.
+                    </p>
+                  </div>
+                )}
+                
                 <div className="space-y-4">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="w-full">
-                        <MessageCircle className="mr-2 h-4 w-4" />
-                        Contact Finder
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Contact About Found Item</DialogTitle>
-                        <DialogDescription>
-                          Send a message to the finder of this item. Provide details that can help verify your ownership.
-                        </DialogDescription>
-                      </DialogHeader>
-                      
-                      {isAuthenticated ? (
-                        <>
-                          <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                              <h4 className="text-sm font-medium">Your Message</h4>
-                              <Textarea
-                                placeholder="Describe the item in detail to prove ownership (specific marks, contents, etc.)"
-                                className="min-h-[120px]"
-                                value={message}
-                                onChange={(e) => setMessage(e.target.value)}
-                              />
-                            </div>
-                            
-                            {item.contact_preference !== 'app' && (
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium">Your Contact Information</h4>
-                                <div className="flex items-center">
-                                  {item.contact_preference === 'email' ? (
-                                    <>
-                                      <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                                      <Input placeholder="Your email address" />
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                                      <Input placeholder="Your phone number" />
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <DialogFooter>
-                            <Button type="submit" onClick={handleSendMessage} disabled={isSending}>
-                              {isSending ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Sending...
-                                </>
-                              ) : (
-                                "Send Message"
-                              )}
-                            </Button>
-                          </DialogFooter>
-                        </>
+                  {!isFinderUser && isItemActive && (
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setIsClaimModalOpen(true)}
+                      disabled={!!userClaim}
+                    >
+                      {userClaim ? (
+                        <span className="flex items-center">
+                          <Clock className="mr-2 h-4 w-4" />
+                          Claim Pending
+                        </span>
                       ) : (
-                        <div className="py-4 text-center space-y-4">
-                          <p>You need to be signed in to contact the finder.</p>
-                          <Link to="/login">
-                            <Button>Sign In</Button>
-                          </Link>
-                        </div>
+                        <span className="flex items-center">
+                          <MessageCircle className="mr-2 h-4 w-4" />
+                          Claim This Item
+                        </span>
                       )}
-                    </DialogContent>
-                  </Dialog>
+                    </Button>
+                  )}
+                  
+                  {!isFinderUser && userClaim?.status === 'approved' && (
+                    <Button 
+                      className="w-full bg-green-600 hover:bg-green-700" 
+                      onClick={() => setIsClaimModalOpen(true)}
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Contact Finder
+                    </Button>
+                  )}
+                  
+                  {(!isAuthenticated || (!userClaim && !isFinderUser && isItemActive)) && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button className="w-full" variant={isAuthenticated ? "outline" : "default"}>
+                          <MessageCircle className="mr-2 h-4 w-4" />
+                          Contact Finder
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>Contact About Found Item</DialogTitle>
+                          <DialogDescription>
+                            Send a message to the finder of this item. Provide details that can help verify your ownership.
+                          </DialogDescription>
+                        </DialogHeader>
+                        
+                        {isAuthenticated ? (
+                          <>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium">Your Message</h4>
+                                <Textarea
+                                  placeholder="Describe the item in detail to prove ownership (specific marks, contents, etc.)"
+                                  className="min-h-[120px]"
+                                  value={message}
+                                  onChange={(e) => setMessage(e.target.value)}
+                                />
+                              </div>
+                              
+                              {item.contact_preference !== 'app' && (
+                                <div className="space-y-2">
+                                  <h4 className="text-sm font-medium">Your Contact Information</h4>
+                                  <div className="flex items-center">
+                                    {item.contact_preference === 'email' ? (
+                                      <>
+                                        <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <Input placeholder="Your email address" />
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                                        <Input placeholder="Your phone number" />
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <DialogFooter>
+                              <Button type="submit" onClick={handleSendMessage} disabled={isSending}>
+                                {isSending ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Sending...
+                                  </>
+                                ) : (
+                                  "Send Message"
+                                )}
+                              </Button>
+                            </DialogFooter>
+                          </>
+                        ) : (
+                          <div className="py-4 text-center space-y-4">
+                            <p>You need to be signed in to contact the finder.</p>
+                            <Link to="/login">
+                              <Button>Sign In</Button>
+                            </Link>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                  )}
                   
                   <p className="text-xs text-center text-muted-foreground">
                     Please only contact if you believe this is your lost item. Provide specific details 
@@ -442,6 +701,91 @@ const ItemDetails = () => {
           </div>
         </motion.div>
       </div>
+      
+      {/* Claim verification modal */}
+      <ClaimVerification 
+        itemId={item.id}
+        itemName={item.item_name}
+        finderId={item.user_id}
+        isOpen={isClaimModalOpen}
+        onClose={() => setIsClaimModalOpen(false)}
+      />
+      
+      {/* Review claim dialog for finders */}
+      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Review Claim</DialogTitle>
+            <DialogDescription>
+              Carefully review the claimer's description to verify if they are the true owner.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            {selectedClaimId && claims.find(c => c.id === selectedClaimId) && (
+              <>
+                <div className="bg-muted p-4 rounded-md">
+                  <h3 className="text-sm font-medium mb-2">Owner's Description:</h3>
+                  <p className="text-sm">
+                    {claims.find(c => c.id === selectedClaimId)?.owner_description}
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">Your Item Description:</h3>
+                  <p className="text-sm">{item.description}</p>
+                </div>
+              </>
+            )}
+          </div>
+          
+          <DialogFooter className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              className="border-red-200 hover:bg-red-50 text-red-700"
+              onClick={() => handleClaimAction('reject')}
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Reject Claim
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => handleClaimAction('approve')}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Approve Claim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Handover confirmation dialog */}
+      <Dialog open={isHandoverDialogOpen} onOpenChange={setIsHandoverDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Item Return</DialogTitle>
+            <DialogDescription>
+              Please confirm that you have returned the item to its owner.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-sm">
+              Once confirmed, this item will be marked as "Returned to Owner" and will be removed from active listings.
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsHandoverDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMarkCompleted}>
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Confirm Return
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 };

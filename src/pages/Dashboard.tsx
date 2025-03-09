@@ -1,205 +1,262 @@
 
-import React from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/contexts/AuthContext";
 import MainLayout from "@/components/layout/MainLayout";
-import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Loader2, MapPin, Calendar, ChevronRight } from "lucide-react";
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [foundItems, setFoundItems] = useState([]);
+  const [claimedItems, setClaimedItems] = useState([]);
+  const [messages, setMessages] = useState([]);
 
-  const { data: foundItems, isLoading: itemsLoading, error: itemsError } = useQuery({
-    queryKey: ["foundItems", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("found_items")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-  });
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchUserData = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch found items posted by user
+        const { data: foundItemsData } = await supabase
+          .from('found_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        setFoundItems(foundItemsData || []);
+        
+        // Fetch claims made by user
+        const { data: claimsData } = await supabase
+          .from('item_claims')
+          .select(`
+            *,
+            found_items (*)
+          `)
+          .eq('claimer_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        setClaimedItems(claimsData || []);
+        
+        // Fetch recent messages
+        const { data: messagesData } = await supabase
+          .from('item_messages')
+          .select(`
+            *,
+            found_items!inner (item_name, id)
+          `)
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        setMessages(messagesData || []);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUserData();
+  }, [user]);
 
-  const { data: successStories, isLoading: storiesLoading, error: storiesError } = useQuery({
-    queryKey: ["successStories", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("success_stories")
-        .select("*")
-        .eq("finder_id", user?.id)
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-  });
-
-  const { data: queries, isLoading: queriesLoading, error: queriesError } = useQuery({
-    queryKey: ["lostQueries", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("lost_item_queries")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-  });
-
-  const isLoading = itemsLoading || storiesLoading || queriesLoading;
-  const hasError = itemsError || storiesError || queriesError;
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="container py-16 flex justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+      <div className="container py-16">
+        <h1 className="text-3xl font-bold mb-8">Your Dashboard</h1>
         
-        {hasError && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              An error occurred loading your dashboard data. Please try again later.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {isLoading ? (
-          <div className="flex justify-center my-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : (
-          <Tabs defaultValue="found" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-8">
-              <TabsTrigger value="found">Found Items ({foundItems?.length || 0})</TabsTrigger>
-              <TabsTrigger value="lost">Lost Queries ({queries?.length || 0})</TabsTrigger>
-              <TabsTrigger value="success">Success Stories ({successStories?.length || 0})</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="found" className="space-y-4">
-              {foundItems?.length === 0 ? (
-                <EmptyState 
-                  title="No found items yet"
-                  description="You haven't reported any found items yet. Help return lost items to their owners."
-                  actionLabel="Report a found item"
-                  actionLink="/post-found-item"
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {foundItems?.map((item) => (
-                    <Card key={item.id}>
-                      <CardHeader>
-                        <CardTitle className="truncate">{item.item_name}</CardTitle>
-                        <CardDescription>Found at {item.location}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                          {item.description}
-                        </p>
-                        <Button asChild size="sm">
-                          <Link to={`/item-details/${item.id}`}>View Details</Link>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
+        <Tabs defaultValue="found" className="space-y-6">
+          <TabsList className="grid w-full md:w-auto grid-cols-3">
+            <TabsTrigger value="found">Found Items</TabsTrigger>
+            <TabsTrigger value="claimed">Claimed Items</TabsTrigger>
+            <TabsTrigger value="messages">Messages</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="found" className="space-y-6">
+            {foundItems.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground mb-4">You haven't posted any found items yet.</p>
+                  <Link to="/post-found-item">
+                    <Button>Post a Found Item</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold">Your Posted Items</h2>
+                  <Link to="/post-found-item">
+                    <Button variant="outline">Post New Item</Button>
+                  </Link>
                 </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="lost" className="space-y-4">
-              {queries?.length === 0 ? (
-                <EmptyState 
-                  title="No lost item queries"
-                  description="You haven't created any searches for lost items yet."
-                  actionLabel="Search for lost items"
-                  actionLink="/search-lost-items"
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {queries?.map((query) => (
-                    <Card key={query.id}>
-                      <CardHeader>
-                        <CardTitle>Lost Item Query</CardTitle>
-                        <CardDescription>Location: {query.location || "Not specified"}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                          {query.query_text}
-                        </p>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(query.created_at).toLocaleDateString()}
-                          </span>
-                          <Button asChild size="sm" variant="outline">
-                            <Link to="/search-lost-items">Search Again</Link>
-                          </Button>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {foundItems.map((item) => (
+                    <Card key={item.id}>
+                      <CardContent className="p-0">
+                        <div className="grid grid-cols-3 h-full">
+                          <div className="col-span-1 h-full">
+                            {item.images && item.images.length > 0 ? (
+                              <img 
+                                src={item.images[0]} 
+                                alt={item.item_name} 
+                                className="h-full w-full object-cover aspect-square"
+                              />
+                            ) : (
+                              <div className="h-full w-full bg-muted flex items-center justify-center">
+                                <p className="text-muted-foreground text-xs">No image</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="col-span-2 p-4 flex flex-col justify-between">
+                            <div>
+                              <h3 className="font-semibold text-lg mb-1">{item.item_name}</h3>
+                              <div className="flex items-center text-sm text-muted-foreground mb-2">
+                                <MapPin className="h-3 w-3 mr-1" />
+                                <span className="truncate">{item.location}</span>
+                              </div>
+                              <div className="text-xs flex gap-2 mb-2">
+                                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                  {item.category}
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full ${
+                                  item.status === 'active' ? 'bg-green-100 text-green-800' : 
+                                  item.status === 'claimed' ? 'bg-orange-100 text-orange-800' : 
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {item.status === 'active' ? 'Active' : 
+                                   item.status === 'claimed' ? 'Claimed' : 
+                                   item.status === 'completed' ? 'Completed' : 
+                                   'Archived'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center pt-2">
+                              <Link to={`/item-details/${item.id}`} className="text-primary text-sm flex items-center">
+                                View Details
+                                <ChevronRight className="h-4 w-4 ml-1" />
+                              </Link>
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="success" className="space-y-4">
-              {successStories?.length === 0 ? (
-                <EmptyState 
-                  title="No success stories yet"
-                  description="You haven't reunited any items with their owners yet. Keep helping!"
-                  actionLabel="Report a found item"
-                  actionLink="/post-found-item"
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {successStories?.map((story) => (
-                    <Card key={story.id}>
-                      <CardHeader>
-                        <CardTitle>{story.title}</CardTitle>
-                        <CardDescription>
-                          {story.is_verified ? "Verified Success Story" : "Waiting Verification"}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                          {story.description}
-                        </p>
-                        <Button asChild size="sm">
-                          <Link to={`/success-stories`}>View All Stories</Link>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        )}
+              </>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="claimed" className="space-y-6">
+            {claimedItems.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground">You haven't claimed any items yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {claimedItems.map((claim) => (
+                  <Card key={claim.id}>
+                    <CardContent className="p-0">
+                      <div className="grid grid-cols-3 h-full">
+                        <div className="col-span-1 h-full">
+                          {claim.found_items.images && claim.found_items.images.length > 0 ? (
+                            <img 
+                              src={claim.found_items.images[0]} 
+                              alt={claim.found_items.item_name} 
+                              className="h-full w-full object-cover aspect-square"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-muted flex items-center justify-center">
+                              <p className="text-muted-foreground text-xs">No image</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="col-span-2 p-4 flex flex-col justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg mb-1">{claim.found_items.item_name}</h3>
+                            <div className="text-xs flex gap-2 mb-2">
+                              <span className={`px-2 py-0.5 rounded-full ${
+                                claim.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                claim.status === 'approved' ? 'bg-green-100 text-green-800' : 
+                                claim.status === 'rejected' ? 'bg-red-100 text-red-800' : 
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {claim.status === 'pending' ? 'Pending Approval' : 
+                                 claim.status === 'approved' ? 'Approved' : 
+                                 claim.status === 'rejected' ? 'Rejected' : 
+                                 'Completed'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center pt-2">
+                            <Link to={`/item-details/${claim.item_id}`} className="text-primary text-sm flex items-center">
+                              View Details
+                              <ChevronRight className="h-4 w-4 ml-1" />
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="messages" className="space-y-6">
+            {messages.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p className="text-muted-foreground">You don't have any messages yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <Card key={message.id}>
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-sm font-medium">
+                        Re: {message.found_items.item_name}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="py-2">
+                      <p className="text-sm">{message.content}</p>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(message.created_at).toLocaleString()}
+                        </span>
+                        <Link to={`/item-details/${message.found_items.id}`} className="text-primary text-xs flex items-center">
+                          View Conversation
+                          <ChevronRight className="h-3 w-3 ml-1" />
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
-  );
-};
-
-const EmptyState = ({ title, description, actionLabel, actionLink }) => {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 bg-muted/50 rounded-lg">
-      <h3 className="text-xl font-semibold mb-2">{title}</h3>
-      <p className="text-muted-foreground mb-6 text-center max-w-md">{description}</p>
-      <Button asChild>
-        <Link to={actionLink}>{actionLabel}</Link>
-      </Button>
-    </div>
   );
 };
 

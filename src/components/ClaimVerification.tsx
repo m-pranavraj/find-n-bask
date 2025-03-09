@@ -1,237 +1,197 @@
 
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, Check, AlertCircle, ChevronRight } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ChatInterface from "./ChatInterface";
 
 interface ClaimVerificationProps {
-  isOpen: boolean;
-  onClose: () => void;
   itemId: string;
   itemName: string;
-  onClaimSubmitted: () => void;
+  finderId: string;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-const ClaimVerification = ({ isOpen, onClose, itemId, itemName, onClaimSubmitted }: ClaimVerificationProps) => {
+const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: ClaimVerificationProps) => {
   const { user } = useAuth();
-  const [step, setStep] = useState(1);
-  const [proofText, setProofText] = useState("");
-  const [identificationInfo, setIdentificationInfo] = useState("");
-  const [contactInfo, setContactInfo] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<"initial" | "pending" | "approved" | "rejected">("initial");
+  const [claimId, setClaimId] = useState<string | null>(null);
+  
+  // Check if user already has a claim for this item
+  const checkExistingClaim = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('item_claims')
+        .select('*')
+        .eq('item_id', itemId)
+        .eq('claimer_id', user.id)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') { // PGRST116 is the "no rows found" error
+        throw error;
+      }
+      
+      if (data) {
+        setClaimId(data.id);
+        setClaimStatus(data.status as any);
+        setDescription(data.owner_description);
+      }
+    } catch (error) {
+      console.error("Error checking existing claim:", error);
+    }
+  };
+  
+  useState(() => {
+    if (isOpen) {
+      checkExistingClaim();
+    }
+  });
+  
   const handleSubmitClaim = async () => {
     if (!user) {
       toast.error("You must be logged in to claim an item");
       return;
     }
-
-    setIsSubmitting(true);
+    
+    if (!description.trim()) {
+      toast.error("Please provide a description to prove ownership");
+      return;
+    }
+    
+    setSubmitting(true);
     try {
-      // 1. Create a claim record in the database
-      const { error: claimError } = await supabase
+      const { data, error } = await supabase
         .from('item_claims')
         .insert({
           item_id: itemId,
-          user_id: user.id,
-          proof_text: proofText,
-          identification_info: identificationInfo,
-          contact_info: contactInfo,
-          status: "pending" // pending, approved, rejected
-        });
-
-      if (claimError) throw claimError;
-
-      // 2. Update item status to "claim_pending"
-      const { error: updateError } = await supabase
-        .from('found_items')
-        .update({ status: "claim_pending" })
-        .eq('id', itemId);
-
-      if (updateError) throw updateError;
-
-      // Show success message
+          claimer_id: user.id,
+          owner_description: description,
+          status: 'pending'
+        })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
       toast.success("Claim submitted successfully", {
-        description: "The finder will review your claim and contact you soon.",
+        description: "The finder will review your claim and contact you soon"
       });
-
-      // Let parent component know the claim was submitted
-      onClaimSubmitted();
-      onClose();
-
+      
+      setClaimId(data.id);
+      setClaimStatus("pending");
     } catch (error: any) {
-      toast.error("Error submitting claim", {
-        description: error.message || "Please try again later",
+      toast.error("Failed to submit claim", {
+        description: error.message || "Please try again later"
       });
-      console.error("Error submitting claim:", error);
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
-
-  const nextStep = () => {
-    if (step === 1 && !proofText.trim()) {
-      toast.error("Please provide proof of ownership");
-      return;
-    }
-    if (step === 2 && !identificationInfo.trim()) {
-      toast.error("Please provide identification information");
-      return;
-    }
-    setStep(step + 1);
-  };
-
-  const prevStep = () => {
-    setStep(step - 1);
-  };
-
+  
+  if (claimStatus === "approved") {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Chat with the finder</DialogTitle>
+            <DialogDescription>
+              Your claim has been approved! Use this chat to arrange the item handover.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ChatInterface 
+            itemId={itemId} 
+            recipientId={finderId} 
+            claimId={claimId || ''} 
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Claim Process: {itemName}</DialogTitle>
+          <DialogTitle>Claim "{itemName}"</DialogTitle>
           <DialogDescription>
-            Please complete all steps to verify your ownership of this item.
+            {claimStatus === "initial" && "Provide details that can help verify your ownership."}
+            {claimStatus === "pending" && "Your claim is being reviewed by the finder."}
+            {claimStatus === "rejected" && "Your claim has been rejected by the finder."}
           </DialogDescription>
         </DialogHeader>
-
-        {/* Progress indicator */}
-        <div className="flex justify-between mb-6 px-2">
-          {[1, 2, 3].map((stepNumber) => (
-            <div key={stepNumber} className="flex flex-col items-center">
-              <div 
-                className={`w-8 h-8 rounded-full flex items-center justify-center 
-                            ${step === stepNumber 
-                              ? 'bg-primary text-primary-foreground' 
-                              : step > stepNumber 
-                                ? 'bg-green-500 text-white' 
-                                : 'bg-muted text-muted-foreground'}`}
-              >
-                {step > stepNumber ? <Check className="h-4 w-4" /> : stepNumber}
+        
+        {claimStatus === "pending" && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <Loader2 className="h-10 w-10 text-primary mx-auto mb-4 animate-spin" />
+              <h3 className="text-lg font-medium mb-2">Claim Under Review</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                The finder is currently reviewing your claim. You'll be notified once they respond.
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {claimStatus === "rejected" && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <XCircle className="h-10 w-10 text-destructive mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Claim Rejected</h3>
+              <p className="text-muted-foreground text-sm mb-4">
+                The finder has determined that the item doesn't match your description.
+              </p>
+              <Button variant="outline" onClick={onClose}>Close</Button>
+            </div>
+          </div>
+        )}
+        
+        {claimStatus === "initial" && (
+          <>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="owner-description">Describe the item in detail to prove ownership</Label>
+                <Textarea
+                  id="owner-description"
+                  placeholder="Please include any specific details, markings, or contents that only the true owner would know..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="min-h-[120px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Be as specific as possible. Include details like serial numbers, unique marks, or contents that only the owner would know.
+                </p>
               </div>
-              <span className="text-xs mt-1 text-muted-foreground">
-                {stepNumber === 1 ? 'Ownership Proof' : 
-                 stepNumber === 2 ? 'Identification' : 'Contact Info'}
-              </span>
             </div>
-          ))}
-        </div>
-
-        <Separator />
-
-        {/* Step 1: Ownership Proof */}
-        {step === 1 && (
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="ownership-proof">Proof of Ownership</Label>
-              <Textarea
-                id="ownership-proof"
-                placeholder="Describe specific details about the item that only the owner would know (e.g., unique marks, scratches, contents inside, serial number)"
-                className="min-h-[150px]"
-                value={proofText}
-                onChange={(e) => setProofText(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                <AlertCircle className="inline h-3 w-3 mr-1" />
-                Your claim will be reviewed by the finder. Providing detailed information increases your chances of recovering your item.
-              </p>
-            </div>
-          </div>
+            
+            <DialogFooter>
+              <Button 
+                type="submit" 
+                onClick={handleSubmitClaim} 
+                disabled={submitting || !description.trim()}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit Claim"
+                )}
+              </Button>
+            </DialogFooter>
+          </>
         )}
-
-        {/* Step 2: Identification */}
-        {step === 2 && (
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="identification">Identification Information</Label>
-              <Textarea
-                id="identification"
-                placeholder="Describe how you can verify your identity (e.g., photo ID, purchase receipt, photos of you with the item)"
-                className="min-h-[150px]"
-                value={identificationInfo}
-                onChange={(e) => setIdentificationInfo(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                <AlertCircle className="inline h-3 w-3 mr-1" />
-                You will need to provide this verification when meeting the finder.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Contact Information */}
-        {step === 3 && (
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="contact-info">Contact Information</Label>
-              <Textarea
-                id="contact-info"
-                placeholder="Provide your preferred contact information (phone number, email, etc.)"
-                className="min-h-[100px]"
-                value={contactInfo}
-                onChange={(e) => setContactInfo(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                <AlertCircle className="inline h-3 w-3 mr-1" />
-                This information will only be shared with the finder if your claim is approved.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">What happens next?</Label>
-              <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1 pl-2">
-                <li>The finder will review your claim</li>
-                <li>If approved, you'll be able to chat with the finder</li>
-                <li>Arrange a safe meeting to retrieve your item</li>
-                <li>The item will be marked as claimed after verification</li>
-              </ol>
-            </div>
-          </div>
-        )}
-
-        <DialogFooter className="flex justify-between sm:justify-between">
-          {step > 1 ? (
-            <Button variant="outline" onClick={prevStep} type="button">
-              Back
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={onClose} type="button">
-              Cancel
-            </Button>
-          )}
-
-          {step < 3 ? (
-            <Button onClick={nextStep} type="button">
-              Next
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button onClick={handleSubmitClaim} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                "Submit Claim"
-              )}
-            </Button>
-          )}
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -19,6 +19,7 @@ export type Database = {
           images: string[]
           item_name: string
           location: string
+          status: string
           updated_at: string
           user_id: string
         }
@@ -31,6 +32,7 @@ export type Database = {
           images?: string[]
           item_name: string
           location: string
+          status?: string
           updated_at?: string
           user_id: string
         }
@@ -43,10 +45,87 @@ export type Database = {
           images?: string[]
           item_name?: string
           location?: string
+          status?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
+      }
+      item_claims: {
+        Row: {
+          claimer_id: string
+          created_at: string
+          id: string
+          item_id: string
+          owner_description: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          claimer_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          owner_description: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          claimer_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          owner_description?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_claims_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "found_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      item_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean
+          item_id: string
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          item_id: string
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          item_id?: string
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_messages_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "found_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lost_item_queries: {
         Row: {
