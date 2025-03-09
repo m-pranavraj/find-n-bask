@@ -42,7 +42,7 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
       setIsLoading(true);
       try {
         // Mock API call - in a real application, we would call a places API like Google Places
-        // For now we'll simulate it with some mock data
+        // For now we'll simulate it with some mock data that includes Indian locations
         await new Promise(resolve => setTimeout(resolve, 300));
         
         const mockSuggestions = [
@@ -64,26 +64,50 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
           },
           {
             place_id: "3",
-            description: "New Orleans, LA, USA",
+            description: "CMR Central, Visakhapatnam, Andhra Pradesh, India",
             structured_formatting: {
-              main_text: "New Orleans",
-              secondary_text: "LA, USA"
+              main_text: "CMR Central",
+              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
             }
           },
           {
             place_id: "4",
-            description: "Newcastle upon Tyne, UK",
+            description: "Waltair Junction, Visakhapatnam, Andhra Pradesh, India",
             structured_formatting: {
-              main_text: "Newcastle upon Tyne",
-              secondary_text: "UK"
+              main_text: "Waltair Junction",
+              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
             }
           },
           {
             place_id: "5",
-            description: "Newport Beach, CA, USA",
+            description: "RTC Complex, Visakhapatnam, Andhra Pradesh, India",
             structured_formatting: {
-              main_text: "Newport Beach",
-              secondary_text: "CA, USA"
+              main_text: "RTC Complex",
+              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
+            }
+          },
+          {
+            place_id: "6",
+            description: "Jagadamba Junction, Visakhapatnam, Andhra Pradesh, India",
+            structured_formatting: {
+              main_text: "Jagadamba Junction",
+              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
+            }
+          },
+          {
+            place_id: "7",
+            description: "MVP Colony, Visakhapatnam, Andhra Pradesh, India",
+            structured_formatting: {
+              main_text: "MVP Colony",
+              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
+            }
+          },
+          {
+            place_id: "8",
+            description: "Beach Road, Visakhapatnam, Andhra Pradesh, India",
+            structured_formatting: {
+              main_text: "Beach Road",
+              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
             }
           }
         ].filter(place => 
@@ -130,7 +154,6 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
     setIsFocused(true);
     if (inputValue.trim().length >= 2) {
       // Re-show suggestions when focusing
-      // (We could refetch here if needed)
     }
   };
 

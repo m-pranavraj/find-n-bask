@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -164,7 +163,7 @@ const PostFoundItem = () => {
           
         if (error) {
           console.error("Error uploading image:", error);
-          throw error;
+          throw new Error(`Image upload failed: ${error.message}`);
         }
         
         // Get URL for the uploaded image
@@ -190,7 +189,7 @@ const PostFoundItem = () => {
         });
         
       if (error) {
-        throw error;
+        throw new Error(`Database error: ${error.message}`);
       }
       
       // Show success toast
@@ -285,7 +284,7 @@ const PostFoundItem = () => {
                         <PlaceSearch 
                           value={field.value} 
                           onChange={handleLocationChange}
-                          placeholder="e.g. Waltair Junction, Vizag" 
+                          placeholder="e.g. CMR Central, Visakhapatnam" 
                         />
                       </FormControl>
                       <FormMessage />
