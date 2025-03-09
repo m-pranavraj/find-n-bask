@@ -24,6 +24,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/use-debounce";
 import PlaceSearch from "@/components/PlaceSearch";
+import { useToast } from "@/hooks/use-toast";
 
 const categories = [
   "All Categories",
@@ -48,6 +49,7 @@ const timeframes = [
 
 const SearchLostItems = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedTimeframe, setSelectedTimeframe] = useState("Any Time");
@@ -55,8 +57,30 @@ const SearchLostItems = () => {
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  
+  // Check if user is authenticated
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+    
+    checkUser();
+    
+    // Subscribe to auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+    
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
   
   useEffect(() => {
     const fetchFoundItems = async () => {
@@ -100,9 +124,6 @@ const SearchLostItems = () => {
           }
         }
         
-        // Limit the results to 2 items as requested
-        query = query.limit(2);
-        
         const { data, error: fetchError } = await query;
         
         if (fetchError) throw fetchError;
@@ -132,22 +153,40 @@ const SearchLostItems = () => {
   const saveSearchQuery = async () => {
     if (!searchQuery.trim()) return;
     
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save your search queries.",
+        variant: "default"
+      });
+      return;
+    }
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('lost_item_queries')
+        .insert({
+          user_id: user.id,
+          query_text: searchQuery,
+          category: selectedCategory !== "All Categories" ? selectedCategory.toLowerCase() : null,
+          location: location || null,
+          timeframe: selectedTimeframe !== "Any Time" ? selectedTimeframe : null
+        });
+        
+      if (error) throw error;
       
-      if (user) {
-        await supabase
-          .from('lost_item_queries')
-          .insert({
-            user_id: user.id,
-            query_text: searchQuery,
-            category: selectedCategory !== "All Categories" ? selectedCategory.toLowerCase() : null,
-            location: location || null,
-            timeframe: selectedTimeframe !== "Any Time" ? selectedTimeframe : null
-          });
-      }
-    } catch (error) {
+      toast({
+        title: "Search saved",
+        description: "Your search query has been saved.",
+        variant: "default"
+      });
+    } catch (error: any) {
       console.error("Error saving search query:", error);
+      toast({
+        title: "Error saving search",
+        description: error.message || "Could not save your search query.",
+        variant: "destructive"
+      });
     }
   };
 
