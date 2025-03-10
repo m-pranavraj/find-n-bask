@@ -56,6 +56,8 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
     const fetchSuggestions = async () => {
       setIsLoading(true);
       try {
+        console.log(`Fetching place suggestions for: "${debouncedValue}"`);
+        
         // Use Supabase Edge Function to call Google Places API
         const { data, error } = await supabase.functions.invoke('google-places-api', {
           body: {
@@ -64,15 +66,24 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
           }
         });
         
-        if (error) throw new Error(error.message);
+        if (error) {
+          console.error("Error from Supabase function:", error);
+          throw new Error(error.message);
+        }
+        
+        if (data.error) {
+          console.error("Error from Google Places API:", data.error, data.details);
+          throw new Error(data.error);
+        }
         
         if (data.suggestions && Array.isArray(data.suggestions)) {
+          console.log(`Got ${data.suggestions.length} suggestions:`, data.suggestions);
           setSuggestions(data.suggestions);
         } else {
           console.error('Unexpected response format:', data);
           setSuggestions([]);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching place suggestions:', error);
         toast({
           title: "Error fetching locations",
@@ -80,7 +91,7 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
           variant: "destructive"
         });
         
-        // Fallback to mock data
+        // Fallback to mock data for India locations
         const mockSuggestions = [
           {
             place_id: "1",
@@ -92,17 +103,57 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
           },
           {
             place_id: "2",
-            description: "CMR Central, Visakhapatnam, Andhra Pradesh, India",
+            description: "Mumbai, Maharashtra, India",
             structured_formatting: {
-              main_text: "CMR Central",
-              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
+              main_text: "Mumbai",
+              secondary_text: "Maharashtra, India"
             }
           },
           {
             place_id: "3",
-            description: "Waltair Junction, Visakhapatnam, Andhra Pradesh, India",
+            description: "Kolkata, West Bengal, India",
             structured_formatting: {
-              main_text: "Waltair Junction",
+              main_text: "Kolkata",
+              secondary_text: "West Bengal, India"
+            }
+          },
+          {
+            place_id: "4",
+            description: "Chennai, Tamil Nadu, India",
+            structured_formatting: {
+              main_text: "Chennai",
+              secondary_text: "Tamil Nadu, India"
+            }
+          },
+          {
+            place_id: "5",
+            description: "Bengaluru, Karnataka, India",
+            structured_formatting: {
+              main_text: "Bengaluru",
+              secondary_text: "Karnataka, India"
+            }
+          },
+          {
+            place_id: "6",
+            description: "Hyderabad, Telangana, India",
+            structured_formatting: {
+              main_text: "Hyderabad",
+              secondary_text: "Telangana, India"
+            }
+          },
+          {
+            place_id: "7",
+            description: "Visakhapatnam, Andhra Pradesh, India",
+            structured_formatting: {
+              main_text: "Visakhapatnam",
+              secondary_text: "Andhra Pradesh, India"
+            }
+          },
+          {
+            place_id: "8",
+            description: "CMR Central, Visakhapatnam, Andhra Pradesh, India",
+            structured_formatting: {
+              main_text: "CMR Central",
               secondary_text: "Visakhapatnam, Andhra Pradesh, India"
             }
           }
@@ -139,6 +190,7 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
   };
 
   const handleSuggestionClick = (suggestion: PlaceSuggestion) => {
+    console.log(`Selected location: ${suggestion.description}`);
     setInputValue(suggestion.description);
     onChange(suggestion.description);
     setSuggestions([]);
