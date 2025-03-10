@@ -19,7 +19,8 @@ import {
   Filter,
   ChevronRight,
   Loader2,
-  AlertCircle 
+  AlertCircle,
+  BookmarkPlus 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -58,8 +59,10 @@ const SearchLostItems = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(false);
   
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const debouncedLocation = useDebounce(location, 300);
   
   // Check if user is authenticated
   useEffect(() => {
@@ -103,8 +106,23 @@ const SearchLostItems = () => {
           query = query.eq('category', selectedCategory.toLowerCase());
         }
         
-        if (location) {
-          query = query.ilike('location', `%${location}%`);
+        if (debouncedLocation) {
+          // Split the location into parts to enable more flexible searching
+          const locationParts = debouncedLocation.split(',').map(part => part.trim());
+          
+          // Build "or" conditions for each part of the location
+          let locationFilter = '';
+          
+          locationParts.forEach((part, index) => {
+            if (part && part.length > 2) { // Only use parts that are long enough to be meaningful
+              if (index > 0) locationFilter += ',';
+              locationFilter += `location.ilike.%${part}%`;
+            }
+          });
+          
+          if (locationFilter) {
+            query = query.or(locationFilter);
+          }
         }
         
         if (selectedTimeframe !== "Any Time") {
@@ -124,25 +142,43 @@ const SearchLostItems = () => {
           }
         }
         
+        console.log('Executing search with filters:', { 
+          searchQuery: debouncedSearchQuery, 
+          category: selectedCategory, 
+          location: debouncedLocation,
+          timeframe: selectedTimeframe 
+        });
+        
         const { data, error: fetchError } = await query;
         
         if (fetchError) throw fetchError;
         
+        console.log(`Found ${data?.length || 0} results`);
         setResults(data || []);
       } catch (err: any) {
         console.error("Error fetching found items:", err);
         setError(err.message || "Failed to load found items");
       } finally {
         setIsLoading(false);
+        setIsSearching(false);
       }
     };
     
-    fetchFoundItems();
-  }, [debouncedSearchQuery, selectedCategory, selectedTimeframe, location]);
+    // Only run the search if we have changed search parameters or on initial load
+    if (isSearching || 
+        (!isLoading && (
+          debouncedSearchQuery || 
+          debouncedLocation || 
+          selectedCategory !== "All Categories" || 
+          selectedTimeframe !== "Any Time"
+        ))) {
+      fetchFoundItems();
+    }
+  }, [debouncedSearchQuery, selectedCategory, selectedTimeframe, debouncedLocation, isSearching]);
   
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // The search is already triggered by the useEffect
+    setIsSearching(true);
   };
   
   const handleItemClick = (itemId: string) => {
@@ -151,7 +187,16 @@ const SearchLostItems = () => {
   
   // Save search query to history
   const saveSearchQuery = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() && !location.trim() && 
+        selectedCategory === "All Categories" && 
+        selectedTimeframe === "Any Time") {
+      toast({
+        title: "Empty search",
+        description: "Please enter at least one search parameter to save.",
+        variant: "default"
+      });
+      return;
+    }
     
     if (!user) {
       toast({
@@ -177,7 +222,7 @@ const SearchLostItems = () => {
       
       toast({
         title: "Search saved",
-        description: "Your search query has been saved.",
+        description: "We'll notify you when matching items are found.",
         variant: "default"
       });
     } catch (error: any) {
@@ -188,6 +233,12 @@ const SearchLostItems = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleLocationChange = (newLocation: string) => {
+    setLocation(newLocation);
+    // Allow a small delay for the UI to update before initiating search
+    setTimeout(() => setIsSearching(true), 100);
   };
 
   return (
@@ -226,7 +277,10 @@ const SearchLostItems = () => {
                 <div>
                   <Select
                     value={selectedCategory}
-                    onValueChange={setSelectedCategory}
+                    onValueChange={(value) => {
+                      setSelectedCategory(value);
+                      setIsSearching(true);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Category" />
@@ -244,7 +298,7 @@ const SearchLostItems = () => {
                 <div>
                   <PlaceSearch
                     value={location}
-                    onChange={setLocation}
+                    onChange={handleLocationChange}
                     placeholder="Where did you lose it?"
                   />
                 </div>
@@ -252,7 +306,10 @@ const SearchLostItems = () => {
                 <div>
                   <Select
                     value={selectedTimeframe}
-                    onValueChange={setSelectedTimeframe}
+                    onValueChange={(value) => {
+                      setSelectedTimeframe(value);
+                      setIsSearching(true);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="When" />
@@ -268,24 +325,36 @@ const SearchLostItems = () => {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full py-6 text-lg" 
-                onClick={saveSearchQuery}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-5 w-5" />
-                    Search
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  type="submit" 
+                  className="grow py-6 text-lg" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-5 w-5" />
+                      Search
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="py-6 text-lg"
+                  onClick={saveSearchQuery}
+                  disabled={isLoading}
+                >
+                  <BookmarkPlus className="mr-2 h-5 w-5" />
+                  Save Search
+                </Button>
+              </div>
             </form>
 
             {/* Results */}

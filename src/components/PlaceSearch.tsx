@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { MapPin, Loader2 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useToast } from "@/hooks/use-toast";
 
 interface PlaceSearchProps {
   value: string;
@@ -21,17 +22,20 @@ interface PlaceSuggestion {
 }
 
 const PlaceSearch = ({ value, onChange, placeholder = "Enter location", className = "" }: PlaceSearchProps) => {
+  const { toast } = useToast();
   const [inputValue, setInputValue] = useState(value);
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const debouncedValue = useDebounce(inputValue, 300);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
+  
+  // Sync inputValue with external value when it changes
   useEffect(() => {
     setInputValue(value);
   }, [value]);
 
+  // Fetch suggestions when input value changes
   useEffect(() => {
     if (debouncedValue.trim().length < 2) {
       setSuggestions([]);
@@ -114,16 +118,39 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
           place.description.toLowerCase().includes(debouncedValue.toLowerCase())
         );
         
-        setSuggestions(mockSuggestions);
+        // Sort suggestions to prioritize exact matches or starts with
+        const sortedSuggestions = [...mockSuggestions].sort((a, b) => {
+          const aMainText = a.structured_formatting.main_text.toLowerCase();
+          const bMainText = b.structured_formatting.main_text.toLowerCase();
+          const searchLower = debouncedValue.toLowerCase();
+          
+          // Exact match for main text comes first
+          if (aMainText === searchLower && bMainText !== searchLower) return -1;
+          if (bMainText === searchLower && aMainText !== searchLower) return 1;
+          
+          // Then starts with
+          if (aMainText.startsWith(searchLower) && !bMainText.startsWith(searchLower)) return -1;
+          if (bMainText.startsWith(searchLower) && !aMainText.startsWith(searchLower)) return 1;
+          
+          // Then default sort
+          return 0;
+        });
+        
+        setSuggestions(sortedSuggestions);
       } catch (error) {
         console.error('Error fetching place suggestions:', error);
+        toast({
+          title: "Error fetching locations",
+          description: "Couldn't load location suggestions. Please try again.",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchSuggestions();
-  }, [debouncedValue]);
+  }, [debouncedValue, toast]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -141,6 +168,7 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
+    // Don't call onChange here, we'll do that on suggestion selection or blur
   };
 
   const handleSuggestionClick = (suggestion: PlaceSuggestion) => {
@@ -162,8 +190,27 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
     setTimeout(() => {
       if (!dropdownRef.current?.contains(document.activeElement)) {
         onChange(inputValue);
+        setIsFocused(false);
       }
     }, 200);
+  };
+
+  // Exact match checking function to highlight when user types part of a place name
+  const getHighlightedText = (text: string, highlight: string) => {
+    // Skip highlighting if search term is too short
+    if (highlight.length < 2) return text;
+    
+    const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+    
+    return (
+      <>
+        {parts.map((part, i) => 
+          part.toLowerCase() === highlight.toLowerCase() ? 
+            <span key={i} className="bg-primary/20 font-medium">{part}</span> : 
+            part
+        )}
+      </>
+    );
   };
 
   return (
@@ -180,6 +227,7 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
+          autoComplete="off"
         />
         {isLoading && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -197,8 +245,12 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
                 className="px-4 py-2 hover:bg-accent cursor-pointer"
                 onMouseDown={() => handleSuggestionClick(suggestion)}
               >
-                <div className="font-medium">{suggestion.structured_formatting.main_text}</div>
-                <div className="text-xs text-muted-foreground">{suggestion.structured_formatting.secondary_text}</div>
+                <div className="font-medium">
+                  {getHighlightedText(suggestion.structured_formatting.main_text, debouncedValue)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {suggestion.structured_formatting.secondary_text}
+                </div>
               </li>
             ))}
           </ul>
