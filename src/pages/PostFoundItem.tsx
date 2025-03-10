@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -146,8 +147,12 @@ const PostFoundItem = () => {
     try {
       setIsSubmitting(true);
       
+      console.log("Starting found item submission process...");
+      
       // Save images and get URLs
       const imageUrls: string[] = [];
+      
+      console.log(`Uploading ${images.length} images to storage...`);
       
       for (const imageData of images) {
         // Convert base64 to blob
@@ -155,6 +160,8 @@ const PostFoundItem = () => {
         const blob = await response.blob();
         const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const fileExt = blob.type.split('/')[1];
+        
+        console.log(`Uploading image: ${fileName}.${fileExt}`);
         
         // Upload image to Supabase storage
         const { data, error } = await supabase.storage
@@ -174,8 +181,11 @@ const PostFoundItem = () => {
         imageUrls.push(urlData.publicUrl);
       }
       
+      console.log("All images uploaded successfully. URLs:", imageUrls);
+      console.log("Saving found item data to database...");
+      
       // Save found item data to Supabase
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('found_items')
         .insert({
           user_id: user.id,
@@ -187,10 +197,19 @@ const PostFoundItem = () => {
           images: imageUrls,
           status: "active" // New field to track item status (active, claimed, archived)
         });
-        
+      
       if (error) {
-        throw new Error(`Database error: ${error.message}`);
+        console.error("Database error details:", error);
+        
+        if (error.code === "42501") {
+          // Permission denied error
+          throw new Error(`Database permission denied. Please ensure you're properly logged in and have refreshed your session.`);
+        } else {
+          throw new Error(`Database error: ${error.message}`);
+        }
       }
+      
+      console.log("Found item saved successfully:", data);
       
       // Show success toast
       toast.success("Item reported successfully", {
@@ -203,10 +222,11 @@ const PostFoundItem = () => {
       }, 1500);
       
     } catch (error: any) {
+      console.error("Full error object:", error);
+      
       toast.error("Error submitting item", {
         description: error.message || "Please try again later.",
       });
-      console.error("Error submitting found item:", error);
     } finally {
       setIsSubmitting(false);
     }
