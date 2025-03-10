@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -64,23 +64,61 @@ const categories = [
 
 const PostFoundItem = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const [images, setImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [location, setLocation] = useState("");
 
   // Check if user is authenticated
-  useQuery({
+  const { isLoading: isAuthChecking } = useQuery({
     queryKey: ["user-auth-check"],
     queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (!data.user) {
+          navigate("/login");
+          toast.error("You must be logged in to post a found item");
+        }
+        return data.user;
+      } catch (error) {
+        console.error("Auth check error:", error);
+        toast.error("Authentication error", {
+          description: "Please try logging in again"
+        });
         navigate("/login");
-        toast.error("You must be logged in to post a found item");
+        return null;
       }
-      return data.user;
     },
+    retry: 1,
   });
+
+  // Ensure storage bucket exists
+  useEffect(() => {
+    const verifyStorageBucket = async () => {
+      try {
+        const { data: bucketList, error } = await supabase.storage.listBuckets();
+        
+        if (error) {
+          console.error("Error checking storage buckets:", error);
+          return;
+        }
+        
+        const foundItemBucket = bucketList.find(bucket => bucket.name === 'found-item-images');
+        
+        if (!foundItemBucket) {
+          console.warn("Storage bucket 'found-item-images' not found.");
+        } else {
+          console.log("Storage bucket 'found-item-images' exists.");
+        }
+      } catch (error) {
+        console.error("Failed to verify storage bucket:", error);
+      }
+    };
+    
+    if (user) {
+      verifyStorageBucket();
+    }
+  }, [user]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -139,15 +177,30 @@ const PostFoundItem = () => {
     }
 
     if (!user) {
-      toast.error("You must be logged in to post a found item");
-      navigate("/login");
-      return;
+      // Try to refresh session before redirecting
+      try {
+        await refreshSession();
+        if (!user) {
+          toast.error("You must be logged in to post a found item");
+          navigate("/login");
+          return;
+        }
+      } catch (error) {
+        toast.error("Session expired", {
+          description: "Please log in again to continue"
+        });
+        navigate("/login");
+        return;
+      }
     }
 
     try {
       setIsSubmitting(true);
       
       console.log("Starting found item submission process...");
+      
+      // Refresh session before proceeding with uploads
+      await refreshSession();
       
       // Save images and get URLs
       const imageUrls: string[] = [];
@@ -202,8 +255,30 @@ const PostFoundItem = () => {
         console.error("Database error details:", error);
         
         if (error.code === "42501") {
-          // Permission denied error
-          throw new Error(`Database permission denied. Please ensure you're properly logged in and have refreshed your session.`);
+          // Permission denied error - try refreshing session and retry once
+          console.log("Permission denied error, refreshing session and retrying...");
+          await refreshSession();
+          
+          // Retry the insert operation
+          const retryResult = await supabase
+            .from('found_items')
+            .insert({
+              user_id: user.id,
+              item_name: values.itemName,
+              category: values.category,
+              location: values.location,
+              description: values.description,
+              contact_preference: values.contactPreference,
+              images: imageUrls,
+              status: "active"
+            });
+            
+          if (retryResult.error) {
+            console.error("Retry failed:", retryResult.error);
+            throw new Error(`Database error after refresh: ${retryResult.error.message}`);
+          }
+          
+          console.log("Retry successful:", retryResult.data);
         } else {
           throw new Error(`Database error: ${error.message}`);
         }

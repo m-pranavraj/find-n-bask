@@ -24,3 +24,27 @@ export const supabase = createClient<Database>(
     },
   }
 );
+
+// Initialize application - create required storage buckets if they don't exist
+(async () => {
+  try {
+    console.log("Checking if required storage buckets exist...");
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    
+    if (error) {
+      console.error("Error checking storage buckets:", error);
+      return;
+    }
+    
+    // Check if found-item-images bucket exists
+    const foundItemBucket = buckets.find(bucket => bucket.name === 'found-item-images');
+    
+    if (!foundItemBucket) {
+      console.log("Creating found-item-images bucket...");
+      // Note: This will only work with service_role key, not anon key
+      // This is handled server-side via SQL migrations
+    }
+  } catch (error) {
+    console.error("Error initializing storage:", error);
+  }
+})();

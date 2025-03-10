@@ -13,6 +13,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,20 +24,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchSession = async () => {
-      const { data } = await supabase.auth.getSession();
+  // Function to refresh the session
+  const refreshSession = async () => {
+    try {
+      console.log("Attempting to refresh session...");
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error("Error refreshing session:", error);
+        throw error;
+      }
+      
+      console.log("Session refreshed successfully:", data.session ? "Session exists" : "No session");
       setSession(data.session);
       setUser(data.session?.user ?? null);
-      setIsLoading(false);
+      return data;
+    } catch (error) {
+      console.error("Failed to refresh session:", error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        console.log("Fetching initial session...");
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error getting session:", error);
+        }
+        
+        console.log("Initial session fetch result:", data.session ? "Session exists" : "No session");
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+      } catch (error) {
+        console.error("Failed to fetch session:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
     
     fetchSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log("Auth state changed:", event);
-      setSession(session);
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log("Auth state changed:", event, newSession ? "Session exists" : "No session");
+      
+      if (event === 'TOKEN_REFRESHED') {
+        console.log("Token was refreshed automatically");
+      }
+      
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
       setIsLoading(false);
     });
 
@@ -85,6 +123,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
       
+      // Refresh the session to ensure we have the latest tokens
+      await refreshSession();
+      
       toast.success("Login successful", {
         description: "Welcome back to Find & Bask!",
       });
@@ -128,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signIn,
         signOut,
         isAuthenticated: !!session,
+        refreshSession,
       }}
     >
       {children}
