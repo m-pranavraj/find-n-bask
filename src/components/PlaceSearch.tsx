@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { MapPin, Loader2 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 interface PlaceSearchProps {
   value: string;
@@ -29,11 +31,20 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
   const [isFocused, setIsFocused] = useState(false);
   const debouncedValue = useDebounce(inputValue, 300);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const sessionTokenRef = useRef<string>(uuidv4());
   
   // Sync inputValue with external value when it changes
   useEffect(() => {
     setInputValue(value);
   }, [value]);
+
+  // Reset session token after selection
+  useEffect(() => {
+    if (!isFocused) {
+      // Generate a new session token when user closes the dropdown
+      sessionTokenRef.current = uuidv4();
+    }
+  }, [isFocused]);
 
   // Fetch suggestions when input value changes
   useEffect(() => {
@@ -45,21 +56,34 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
     const fetchSuggestions = async () => {
       setIsLoading(true);
       try {
-        // Mock API call - in a real application, we would call a places API like Google Places
-        // For now we'll simulate it with some mock data that includes Indian locations
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Use Supabase Edge Function to call Google Places API
+        const { data, error } = await supabase.functions.invoke('google-places-api', {
+          body: {
+            input: debouncedValue,
+            sessionToken: sessionTokenRef.current
+          }
+        });
         
+        if (error) throw new Error(error.message);
+        
+        if (data.suggestions && Array.isArray(data.suggestions)) {
+          setSuggestions(data.suggestions);
+        } else {
+          console.error('Unexpected response format:', data);
+          setSuggestions([]);
+        }
+      } catch (error) {
+        console.error('Error fetching place suggestions:', error);
+        toast({
+          title: "Error fetching locations",
+          description: "Couldn't load location suggestions. Using fallback data.",
+          variant: "destructive"
+        });
+        
+        // Fallback to mock data
         const mockSuggestions = [
           {
             place_id: "1",
-            description: "New York, NY, USA",
-            structured_formatting: {
-              main_text: "New York",
-              secondary_text: "NY, USA"
-            }
-          },
-          {
-            place_id: "2",
             description: "New Delhi, Delhi, India",
             structured_formatting: {
               main_text: "New Delhi",
@@ -67,7 +91,7 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
             }
           },
           {
-            place_id: "3",
+            place_id: "2",
             description: "CMR Central, Visakhapatnam, Andhra Pradesh, India",
             structured_formatting: {
               main_text: "CMR Central",
@@ -75,42 +99,10 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
             }
           },
           {
-            place_id: "4",
+            place_id: "3",
             description: "Waltair Junction, Visakhapatnam, Andhra Pradesh, India",
             structured_formatting: {
               main_text: "Waltair Junction",
-              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
-            }
-          },
-          {
-            place_id: "5",
-            description: "RTC Complex, Visakhapatnam, Andhra Pradesh, India",
-            structured_formatting: {
-              main_text: "RTC Complex",
-              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
-            }
-          },
-          {
-            place_id: "6",
-            description: "Jagadamba Junction, Visakhapatnam, Andhra Pradesh, India",
-            structured_formatting: {
-              main_text: "Jagadamba Junction",
-              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
-            }
-          },
-          {
-            place_id: "7",
-            description: "MVP Colony, Visakhapatnam, Andhra Pradesh, India",
-            structured_formatting: {
-              main_text: "MVP Colony",
-              secondary_text: "Visakhapatnam, Andhra Pradesh, India"
-            }
-          },
-          {
-            place_id: "8",
-            description: "Beach Road, Visakhapatnam, Andhra Pradesh, India",
-            structured_formatting: {
-              main_text: "Beach Road",
               secondary_text: "Visakhapatnam, Andhra Pradesh, India"
             }
           }
@@ -118,32 +110,7 @@ const PlaceSearch = ({ value, onChange, placeholder = "Enter location", classNam
           place.description.toLowerCase().includes(debouncedValue.toLowerCase())
         );
         
-        // Sort suggestions to prioritize exact matches or starts with
-        const sortedSuggestions = [...mockSuggestions].sort((a, b) => {
-          const aMainText = a.structured_formatting.main_text.toLowerCase();
-          const bMainText = b.structured_formatting.main_text.toLowerCase();
-          const searchLower = debouncedValue.toLowerCase();
-          
-          // Exact match for main text comes first
-          if (aMainText === searchLower && bMainText !== searchLower) return -1;
-          if (bMainText === searchLower && aMainText !== searchLower) return 1;
-          
-          // Then starts with
-          if (aMainText.startsWith(searchLower) && !bMainText.startsWith(searchLower)) return -1;
-          if (bMainText.startsWith(searchLower) && !aMainText.startsWith(searchLower)) return 1;
-          
-          // Then default sort
-          return 0;
-        });
-        
-        setSuggestions(sortedSuggestions);
-      } catch (error) {
-        console.error('Error fetching place suggestions:', error);
-        toast({
-          title: "Error fetching locations",
-          description: "Couldn't load location suggestions. Please try again.",
-          variant: "destructive"
-        });
+        setSuggestions(mockSuggestions);
       } finally {
         setIsLoading(false);
       }
