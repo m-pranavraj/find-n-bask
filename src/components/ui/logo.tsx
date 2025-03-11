@@ -13,14 +13,14 @@ export const Logo: React.FC<LogoProps> = ({ className }) => {
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"
     >
-      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="2" fill="none" />
+      {/* Magnifying Glass */}
+      <circle cx="20" cy="20" r="12" stroke="currentColor" strokeWidth="3" fill="none" />
       <path 
-        d="M24 12V24L32 28" 
+        d="M28 28L38 38" 
         stroke="currentColor" 
-        strokeWidth="2" 
+        strokeWidth="4" 
         strokeLinecap="round" 
       />
-      <circle cx="24" cy="24" r="3" fill="currentColor" />
     </svg>
   );
 };

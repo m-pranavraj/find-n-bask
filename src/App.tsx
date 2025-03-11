@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -23,32 +24,34 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/signup" element={<SignUp />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/success-stories" element={<SuccessStories />} />
-            <Route path="/search-lost-items" element={<SearchLostItems />} />
-            <Route path="/item-details/:id" element={<ItemDetails />} />
-            
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/post-found-item" element={<PostFoundItem />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/profile" element={<UserProfile />} />
-            </Route>
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider defaultTheme="system">
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/signup" element={<SignUp />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/success-stories" element={<SuccessStories />} />
+              <Route path="/search-lost-items" element={<SearchLostItems />} />
+              <Route path="/item-details/:id" element={<ItemDetails />} />
+              
+              {/* Protected routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/post-found-item" element={<PostFoundItem />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/profile" element={<UserProfile />} />
+              </Route>
+              
+              {/* Catch-all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

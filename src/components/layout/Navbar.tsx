@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -13,6 +12,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { Logo } from "@/components/ui/logo";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import {
   Sheet,
   SheetContent,
@@ -36,7 +36,6 @@ const Navbar = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Handle scroll event to change navbar style
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
@@ -48,7 +47,6 @@ const Navbar = () => {
     };
   }, []);
 
-  // Close mobile menu when location changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
@@ -115,6 +113,8 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-4">
+          <ThemeToggle />
+          
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -159,6 +159,11 @@ const Navbar = () => {
               <SheetTitle>Find & Bask</SheetTitle>
             </SheetHeader>
             <div className="flex flex-col gap-4">
+              <div className="flex items-center">
+                <span className="mr-auto">Toggle theme</span>
+                <ThemeToggle />
+              </div>
+              
               {isAuthenticated ? (
                 <>
                   <Link to="/dashboard">
