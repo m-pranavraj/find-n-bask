@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -58,6 +57,10 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+        playfair: ["Playfair Display", "serif"],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -106,13 +109,6 @@ export default {
         "slide-out-left": "slide-out-left 0.3s ease-out",
         "slide-in-bottom": "slide-in-bottom 0.5s ease-out",
         pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-      },
-      fontFamily: {
-        sans: ["Inter", "sans-serif"],
-      },
-      backdropFilter: {
-        none: "none",
-        blur: "blur(20px)",
       },
     },
   },
