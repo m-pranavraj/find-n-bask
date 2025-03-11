@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -69,8 +70,8 @@ const Navbar = () => {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
           <Link to="/" className="flex items-center gap-2">
-            <Logo className="h-8 w-8" />
-            <span className="font-bold text-xl hidden sm:inline-block">
+            <Logo showText={false} className="h-8 w-8" />
+            <span className="font-playfair font-bold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
               Find & Bask
             </span>
           </Link>
@@ -156,7 +157,12 @@ const Navbar = () => {
           </SheetTrigger>
           <SheetContent side="left">
             <SheetHeader className="mb-6">
-              <SheetTitle>Find & Bask</SheetTitle>
+              <SheetTitle className="flex items-center gap-2">
+                <Logo showText={false} className="h-6 w-6" />
+                <span className="font-playfair font-bold text-lg tracking-tight bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+                  Find & Bask
+                </span>
+              </SheetTitle>
             </SheetHeader>
             <div className="flex flex-col gap-4">
               <div className="flex items-center">
