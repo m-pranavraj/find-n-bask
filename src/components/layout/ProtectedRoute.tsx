@@ -27,10 +27,29 @@ const ProtectedRoute = () => {
     checkAndRefreshSession();
   }, [isAuthenticated, isLoading, refreshSession]);
 
+  // Add a retry mechanism to periodically check auth status
+  useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    const retryInterval = setInterval(() => {
+      if (!isAuthenticated && !isLoading && retryCount < maxRetries) {
+        console.log(`Retry ${retryCount + 1}/${maxRetries} for session refresh`);
+        refreshSession();
+        retryCount++;
+      } else {
+        clearInterval(retryInterval);
+      }
+    }, 2000); // Retry every 2 seconds
+    
+    return () => clearInterval(retryInterval);
+  }, [isAuthenticated, isLoading, refreshSession]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-primary">Checking your session...</span>
       </div>
     );
   }

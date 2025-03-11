@@ -16,10 +16,17 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
     },
     global: {
       headers: {
         'X-Supabase-Client-Info': 'lovable-app',
+      },
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
       },
     },
   }
@@ -41,8 +48,23 @@ export const supabase = createClient<Database>(
     
     if (!foundItemBucket) {
       console.log("Creating found-item-images bucket...");
-      // Note: This will only work with service_role key, not anon key
-      // This is handled server-side via SQL migrations
+      try {
+        const { data, error } = await supabase.storage.createBucket('found-item-images', {
+          public: true,
+          fileSizeLimit: 10485760, // 10MB
+          allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+        });
+        
+        if (error) {
+          console.error("Error creating storage bucket:", error);
+        } else {
+          console.log("Storage bucket created successfully:", data);
+        }
+      } catch (bucketError) {
+        console.error("Exception creating bucket:", bucketError);
+      }
+    } else {
+      console.log("Found-item-images bucket already exists");
     }
   } catch (error) {
     console.error("Error initializing storage:", error);
