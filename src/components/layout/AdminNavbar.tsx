@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
   BarChart3, 
@@ -16,18 +16,24 @@ import {
   Users 
 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useAuth } from "@/contexts/AuthContext";
 import { AdminNavLink } from "@/components/admin/AdminNavLink";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 const AdminNavbar = () => {
   const [isAdmin, setIsAdmin] = useState(false);
-  const { user } = useAuth();
+  const [adminUsername, setAdminUsername] = useState<string | null>(null);
+  const location = useLocation();
   
   useEffect(() => {
+    // Check if admin is authenticated
     const adminAuthenticated = localStorage.getItem("adminAuthenticated") === "true";
     setIsAdmin(adminAuthenticated);
-  }, []);
+    
+    // Set admin username if available
+    if (adminAuthenticated) {
+      setAdminUsername("Admin");
+    }
+  }, [location.pathname]); // Re-check when route changes
 
   if (!isAdmin) {
     return null;
@@ -37,6 +43,12 @@ const AdminNavbar = () => {
     { icon: <Shield className="h-4 w-4 mr-2" />, label: "Admin", href: "/admin/dashboard" },
     { icon: <Home className="h-4 w-4 mr-2" />, label: "Back to Site", href: "/" },
   ];
+  
+  const handleLogout = () => {
+    localStorage.removeItem("adminAuthenticated");
+    localStorage.removeItem("adminLastLogin");
+    window.location.href = "/";
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -100,10 +112,7 @@ const AdminNavbar = () => {
                 variant="destructive" 
                 size="sm"
                 className="mt-4 w-full justify-start"
-                onClick={() => {
-                  localStorage.removeItem("adminAuthenticated");
-                  window.location.href = "/";
-                }}
+                onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -133,19 +142,16 @@ const AdminNavbar = () => {
           <div className="flex items-center">
             <ThemeToggle />
             <div className="ml-4 flex items-center gap-2">
-              {user && (
+              {adminUsername && (
                 <p className="text-sm font-medium">
-                  Admin: {user.email?.split("@")[0]}
+                  Admin: {adminUsername}
                 </p>
               )}
               <Button 
                 variant="destructive" 
                 size="sm"
                 className="hidden md:flex"
-                onClick={() => {
-                  localStorage.removeItem("adminAuthenticated");
-                  window.location.href = "/";
-                }}
+                onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout

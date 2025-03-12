@@ -33,8 +33,8 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AdminNavbar />
           <AuthProvider>
+            <AdminNavbar />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Index />} />
