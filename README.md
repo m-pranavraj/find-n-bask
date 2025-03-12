@@ -1,69 +1,152 @@
-# Welcome to your Lovable project
 
-## Project info
+# Find & Bask - Lost and Found Application
 
-**URL**: https://lovable.dev/projects/c3fdd646-74cd-41ab-9818-7fab15017e80
+Find & Bask is a comprehensive lost and found application that helps connect people who have lost items with those who have found them.
 
-## How can I edit this code?
+## Project Overview
 
-There are several ways of editing your application.
+This application allows users to:
 
-**Use Lovable**
+- Post found items with details and images
+- Search for lost items using various criteria
+- Claim items they've lost
+- Message item finders directly
+- Track the status of their claims
+- View success stories of items returned to their owners
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c3fdd646-74cd-41ab-9818-7fab15017e80) and start prompting.
+## Features
 
-Changes made via Lovable will be committed automatically to this repo.
+- User authentication and profiles
+- Item posting with image upload
+- Advanced search functionality
+- Secure messaging between users
+- Claim verification process
+- Admin panel for complete management
+- Responsive design for all devices
 
-**Use your preferred IDE**
+## Tech Stack
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **Frontend**: React, TypeScript, Vite
+- **Styling**: Tailwind CSS, shadcn/ui
+- **State Management**: React Query
+- **Backend**: Supabase (Authentication, Database, Storage, Edge Functions)
+- **Routing**: React Router
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Admin Panel
 
-Follow these steps:
+The application includes a comprehensive admin panel that allows administrators to:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- View dashboard statistics
+- Manage users
+- Review and moderate items
+- Process item claims
+- Manage database tables directly
+- Configure application settings
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Admin Access
 
-# Step 3: Install the necessary dependencies.
-npm i
+To access the admin panel:
+- URL: `/admin/login`
+- Username: `admin`
+- Password: `FindBask@2023`
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## Project Setup
 
-**Edit a file directly in GitHub**
+### Prerequisites
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Node.js (v18 or newer)
+- npm or yarn
 
-**Use GitHub Codespaces**
+### Installation
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd find-and-bask
+   ```
 
-## What technologies are used for this project?
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-This project is built with .
+3. Create a `.env` file in the root directory with your Supabase credentials:
+   ```
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+4. Start the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
 
-## How can I deploy this project?
+5. Open your browser and navigate to `http://localhost:5173`
 
-Simply open [Lovable](https://lovable.dev/projects/c3fdd646-74cd-41ab-9818-7fab15017e80) and click on Share -> Publish.
+## Deployment
 
-## I want to use a custom domain - is that possible?
+### Deploying to Vercel
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+1. Create a Vercel account if you don't have one
+2. Connect your GitHub repository to Vercel
+3. Configure the environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY)
+4. Deploy the application
+
+### Deploying to Netlify
+
+1. Create a Netlify account if you don't have one
+2. Connect your GitHub repository to Netlify
+3. Set the build command to `npm run build` or `yarn build`
+4. Set the publish directory to `dist`
+5. Configure the environment variables
+6. Deploy the application
+
+## Local Development
+
+1. Clone the repository
+2. Run `npm install` to install dependencies
+3. Set up environment variables:
+   - Create a `.env` file in the project root
+   - Add your Supabase URL and key as described above
+4. Run `npm run dev` to start the development server
+5. Access the app at `http://localhost:5173`
+
+## Environment Variables
+
+- `VITE_SUPABASE_URL`: Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous key
+
+## Database Schema
+
+The application uses Supabase with the following main tables:
+
+- **profiles**: User profile information
+- **found_items**: Details of items that have been found
+- **item_claims**: Claims made by users for found items
+- **item_messages**: Communication between item finders and claimers
+- **lost_item_queries**: Records of searches for lost items
+- **success_stories**: Documented cases of returned items
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contact
+
+If you have any questions or feedback, please reach out to the project maintainers.
+
+---
+
+Happy finding and returning lost items!

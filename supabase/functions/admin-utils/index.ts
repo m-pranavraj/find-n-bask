@@ -35,7 +35,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     // Parse request
-    const { operation } = await req.json();
+    const requestData = await req.json();
+    const { operation } = requestData;
     
     let result;
     
@@ -53,7 +54,7 @@ serve(async (req) => {
         break;
         
       case "deleteStorage":
-        const { path, bucket } = await req.json();
+        const { path, bucket } = requestData;
         
         if (!path || !bucket) {
           throw new Error("Missing path or bucket for storage deletion");

@@ -69,9 +69,12 @@ import {
   X,
 } from "lucide-react";
 
+// Define valid table names as a type for type safety
+type TableName = "profiles" | "found_items" | "item_claims" | "item_messages" | "lost_item_queries" | "success_stories";
+
 const Database = () => {
-  const [tables, setTables] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string>("");
+  const [tables, setTables] = useState<TableName[]>([]);
+  const [selectedTable, setSelectedTable] = useState<TableName | "">("");
   const [tableData, setTableData] = useState<any[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,43 +100,47 @@ const Database = () => {
   const fetchTables = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_tables');
+      // Define default tables to use if RPC fails
+      const defaultTables: TableName[] = ['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'];
       
-      if (error) {
-        // If RPC fails, fallback to fixed table list
-        console.error("Error fetching tables:", error);
-        const defaultTables = ['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'];
+      try {
+        const { data, error } = await supabase.rpc('get_tables');
+        
+        if (error) {
+          console.error("Error fetching tables:", error);
+          setTables(defaultTables);
+          if (defaultTables.length > 0 && !selectedTable) {
+            setSelectedTable(defaultTables[0]);
+          }
+        } else {
+          // Format data if needed
+          const tableNames = Array.isArray(data) ? 
+            data.map(t => typeof t === 'string' ? t : t.table_name) as TableName[] : 
+            defaultTables;
+          
+          // Filter to only include valid table names
+          const validTableNames = tableNames.filter((name): name is TableName => 
+            defaultTables.includes(name as TableName)
+          );
+          
+          setTables(validTableNames);
+          if (validTableNames.length > 0 && !selectedTable) {
+            setSelectedTable(validTableNames[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch tables:", error);
         setTables(defaultTables);
         if (defaultTables.length > 0 && !selectedTable) {
           setSelectedTable(defaultTables[0]);
         }
-      } else {
-        // Format data if needed
-        const tableNames = Array.isArray(data) ? 
-          data.map(t => typeof t === 'string' ? t : t.table_name) : 
-          [];
-        
-        setTables(tableNames);
-        if (tableNames.length > 0 && !selectedTable) {
-          setSelectedTable(tableNames[0]);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch tables:", error);
-      toast.error("Failed to fetch database tables");
-      
-      // Fallback to fixed table list
-      const defaultTables = ['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'];
-      setTables(defaultTables);
-      if (defaultTables.length > 0 && !selectedTable) {
-        setSelectedTable(defaultTables[0]);
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fetchTableData = async (tableName: string) => {
+  const fetchTableData = async (tableName: TableName) => {
     setIsLoading(true);
     try {
       // Use auth.uid() bypass function to avoid RLS for admin
@@ -511,7 +518,7 @@ const Database = () => {
           </div>
         </div>
 
-        <Tabs defaultValue={selectedTable} onValueChange={setSelectedTable}>
+        <Tabs defaultValue={selectedTable} onValueChange={(value) => setSelectedTable(value as TableName)}>
           <div className="flex justify-between items-center mb-4">
             <ScrollArea className="w-full max-w-3xl">
               <TabsList className="flex flex-nowrap">
@@ -579,7 +586,7 @@ const Database = () => {
                       size="sm" 
                       onClick={() => {
                         setSearchQuery('');
-                        fetchTableData(selectedTable);
+                        fetchTableData(table);
                       }}
                     >
                       <X className="h-4 w-4 mr-2" />

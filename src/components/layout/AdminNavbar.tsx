@@ -31,7 +31,7 @@ const AdminNavbar = () => {
     
     // Set admin username if available
     if (adminAuthenticated) {
-      setAdminUsername("Admin");
+      setAdminUsername(localStorage.getItem("adminUsername") || "Admin");
     }
   }, [location.pathname]); // Re-check when route changes
 
@@ -47,6 +47,7 @@ const AdminNavbar = () => {
   const handleLogout = () => {
     localStorage.removeItem("adminAuthenticated");
     localStorage.removeItem("adminLastLogin");
+    localStorage.removeItem("adminUsername");
     window.location.href = "/";
   };
 
