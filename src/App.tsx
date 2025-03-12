@@ -22,6 +22,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import Users from "./pages/admin/Users";
 import Items from "./pages/admin/Items";
+import Database from "./pages/admin/Database";
 import AdminNavbar from "./components/layout/AdminNavbar";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
               <Route path="/admin/users" element={<Users />} />
               <Route path="/admin/items" element={<Items />} />
+              <Route path="/admin/database" element={<Database />} />
               
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
