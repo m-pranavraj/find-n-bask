@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,7 +25,7 @@ interface ClaimVerificationProps {
   onClose: () => void;
 }
 
-// Define form schema for verification
+// Define form schema for verification - only description is required
 const verificationSchema = z.object({
   description: z.string().min(10, "Please provide a detailed description"),
   identificationMarks: z.string().optional(),
@@ -68,10 +68,11 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
         .select('*')
         .eq('item_id', itemId)
         .eq('claimer_id', user.id)
-        .single();
+        .maybeSingle();
         
-      if (error && error.code !== 'PGRST116') { // PGRST116 is the "no rows found" error
-        throw error;
+      if (error) {
+        console.error("Error checking existing claim:", error);
+        return;
       }
       
       if (data) {
@@ -109,11 +110,12 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
     }
   };
   
-  useState(() => {
+  // Use effect hook to check for existing claims when the dialog opens
+  useEffect(() => {
     if (isOpen) {
       checkExistingClaim();
     }
-  });
+  }, [isOpen, user, itemId]);
   
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = event.target.files?.[0];
@@ -155,7 +157,7 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
         .getPublicUrl(filePath);
         
       // Add to uploaded files
-      setUploadedFiles([...uploadedFiles, {
+      setUploadedFiles(prev => [...prev, {
         type,
         url: publicUrl,
         name: file.name
@@ -166,6 +168,9 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
       if (type === 'photo') form.setValue('hasPhoto', true);
       
       toast.success(`${type === 'receipt' ? 'Receipt' : 'Photo'} uploaded successfully`);
+
+      // Clear the input so the same file can be selected again if needed
+      event.target.value = '';
     } catch (error: any) {
       console.error("Error uploading file:", error);
       toast.error("Error uploading file", {
