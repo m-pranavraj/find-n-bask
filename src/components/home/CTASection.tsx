@@ -1,16 +1,20 @@
-
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Upload, Search, Users } from "lucide-react";
+import { ArrowRight, Upload, Search, Users, Shield } from "lucide-react";
 
 const CTASection = () => {
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  useEffect(() => {
+    const adminAuthenticated = localStorage.getItem("adminAuthenticated") === "true";
+    setIsAdmin(adminAuthenticated);
+  }, []);
+  
   return (
-    <section className="py-24 relative overflow-hidden">
-      {/* Gradient background */}
+    <section className="relative py-20 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/80"></div>
       
-      {/* Shape decorations */}
       <div className="absolute top-0 left-0 right-0 h-20 bg-background" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 0)' }}></div>
       <div className="absolute bottom-0 left-0 right-0 h-20 bg-background" style={{ clipPath: 'polygon(0 100%, 100% 0, 100% 100%, 0 100%)' }}></div>
       
@@ -52,6 +56,17 @@ const CTASection = () => {
               <span>Learn more about how it works</span>
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
+          </div>
+          
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            {!isAdmin && (
+              <Button variant="outline" size="lg" asChild>
+                <Link to="/admin/login" className="group">
+                  <Shield className="mr-2 h-5 w-5 text-primary group-hover:text-primary/80" />
+                  Admin Access
+                </Link>
+              </Button>
+            )}
           </div>
         </motion.div>
       </div>

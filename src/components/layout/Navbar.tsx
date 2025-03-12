@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
-import { Menu, X, LogOut, User } from "lucide-react";
+import { Menu, X, LogOut, User, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +54,9 @@ const Navbar = () => {
   const handleSignOut = async () => {
     await signOut();
   };
+
+  // Check if user is admin
+  const isAdmin = localStorage.getItem("adminAuthenticated") === "true";
 
   return (
     <header
@@ -172,6 +174,14 @@ const Navbar = () => {
               
               {isAuthenticated ? (
                 <>
+                  {isAdmin && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/admin/dashboard">
+                        <Shield className="h-4 w-4 mr-2" />
+                        Admin
+                      </Link>
+                    </Button>
+                  )}
                   <Link to="/dashboard">
                     <Button variant="ghost" className="w-full justify-start">
                       Dashboard

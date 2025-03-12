@@ -18,6 +18,11 @@ import SuccessStories from "./pages/SuccessStories";
 import UserProfile from "./pages/UserProfile";
 import ItemDetails from "./pages/ItemDetails";
 import Dashboard from "./pages/Dashboard";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import Users from "./pages/admin/Users";
+import Items from "./pages/admin/Items";
+import AdminNavbar from "./components/layout/AdminNavbar";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +33,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <AdminNavbar />
           <AuthProvider>
             <Routes>
               {/* Public routes */}
@@ -45,6 +51,12 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/profile" element={<UserProfile />} />
               </Route>
+              
+              {/* Admin routes */}
+              <Route path="/admin/login" element={<AdminLogin />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/users" element={<Users />} />
+              <Route path="/admin/items" element={<Items />} />
               
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
