@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,12 +17,12 @@ interface Message {
   is_read: boolean;
   created_at: string;
   sender?: {
-    full_name: string;
-    avatar_url: string;
+    full_name?: string;
+    avatar_url?: string;
   };
   receiver?: {
-    full_name: string;
-    avatar_url: string;
+    full_name?: string;
+    avatar_url?: string;
   };
 }
 
@@ -36,11 +35,13 @@ interface Contact {
   unreadCount?: number;
 }
 
-interface ChatInterfaceProps {
+export interface ChatInterfaceProps {
   itemId?: string;
   itemName?: string;
   receiverId?: string;
   receiverName?: string;
+  recipientId?: string; // Added for backward compatibility
+  claimId?: string; // Added for use in ClaimVerification
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -48,12 +49,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   itemName,
   receiverId,
   receiverName,
+  recipientId, // Support for legacy prop
 }) => {
+  const effectiveReceiverId = receiverId || recipientId; // Use receiverId with fallback to recipientId
   const { user } = useAuth();
   const [newMessage, setNewMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [selectedContact, setSelectedContact] = useState<string | null>(receiverId || null);
+  const [selectedContact, setSelectedContact] = useState<string | null>(effectiveReceiverId || null);
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -110,11 +113,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (selectedContact) {
       fetchMessages(selectedContact);
       // If initial receiverId was provided, mark messages as read
-      if (receiverId === selectedContact) {
+      if (effectiveReceiverId === selectedContact) {
         markMessagesAsRead(selectedContact);
       }
     }
-  }, [selectedContact]);
+  }, [selectedContact, effectiveReceiverId]);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -220,9 +223,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
       
       // If receiverId is provided but not in contacts, add it
-      if (receiverId && !contactMap.has(receiverId) && receiverName) {
-        contactMap.set(receiverId, {
-          id: receiverId,
+      if (effectiveReceiverId && !contactMap.has(effectiveReceiverId) && receiverName) {
+        contactMap.set(effectiveReceiverId, {
+          id: effectiveReceiverId,
           full_name: receiverName,
           avatar_url: null,
           unreadCount: 0
@@ -254,20 +257,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     try {
       setLoading(true);
       
-      // Get messages between current user and selected contact
+      // First, fetch the messages without joins to avoid relationship errors
       const { data, error } = await supabase
         .from('item_messages')
-        .select(`
-          *,
-          sender:profiles!item_messages_sender_id_fkey(full_name, avatar_url),
-          receiver:profiles!item_messages_receiver_id_fkey(full_name, avatar_url)
-        `)
+        .select('*')
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contactId}),and(sender_id.eq.${contactId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
         
       if (error) throw error;
       
-      setMessages(data || []);
+      if (data) {
+        // For each message, fetch the sender and receiver profile data separately
+        const messagesWithProfiles = await Promise.all(data.map(async (message) => {
+          // Fetch sender profile
+          const { data: senderData } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', message.sender_id)
+            .single();
+          
+          // Fetch receiver profile
+          const { data: receiverData } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', message.receiver_id)
+            .single();
+          
+          return {
+            ...message,
+            sender: senderData || { full_name: 'Unknown', avatar_url: '' },
+            receiver: receiverData || { full_name: 'Unknown', avatar_url: '' }
+          };
+        }));
+        
+        setMessages(messagesWithProfiles);
+      }
       
       // Mark messages as read
       markMessagesAsRead(contactId);

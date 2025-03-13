@@ -1,4 +1,3 @@
-
 import AdminLayout from "@/components/layout/AdminLayout";
 import { 
   Card, 
@@ -32,13 +31,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Loader2 } from "lucide-react";
 
 interface ClaimerInfo {
-  full_name: string;
-  email: string;
+  full_name?: string;
+  email?: string;
 }
 
 interface ItemInfo {
-  item_name: string;
-  category: string;
+  item_name?: string;
+  category?: string;
 }
 
 interface Claim {
@@ -69,19 +68,14 @@ const Claims = () => {
     try {
       const { data, error } = await supabase
         .from('item_claims')
-        .select(`
-          *,
-          claimer:profiles(full_name, email),
-          item:found_items(item_name, category)
-        `)
+        .select('*')
         .eq('status', claimStatus)
         .order('created_at', { ascending: false });
         
       if (error) throw error;
       
       if (data) {
-        // Type safe conversion of the data
-        const typedClaims: Claim[] = data.map(claim => ({
+        const claimsBase = data.map(claim => ({
           id: claim.id,
           item_id: claim.item_id,
           claimer_id: claim.claimer_id,
@@ -89,11 +83,29 @@ const Claims = () => {
           status: claim.status as 'pending' | 'approved' | 'rejected',
           created_at: claim.created_at,
           updated_at: claim.updated_at,
-          claimer: claim.claimer as ClaimerInfo,
-          item: claim.item as ItemInfo
         }));
         
-        setClaims(typedClaims);
+        const claimsWithData = await Promise.all(claimsBase.map(async (claim) => {
+          const { data: claimerData } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', claim.claimer_id)
+            .single();
+            
+          const { data: itemData } = await supabase
+            .from('found_items')
+            .select('item_name, category')
+            .eq('id', claim.item_id)
+            .single();
+            
+          return {
+            ...claim,
+            claimer: claimerData || { full_name: 'Unknown', email: 'Unknown' },
+            item: itemData || { item_name: 'Unknown item', category: 'Unknown' }
+          };
+        }));
+        
+        setClaims(claimsWithData);
       }
     } catch (error) {
       console.error('Error fetching claims:', error);
