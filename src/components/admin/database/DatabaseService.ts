@@ -81,7 +81,7 @@ export const clearTable = async (tableName: string): Promise<boolean> => {
       }
       
       const { error } = await supabase.rpc('admin_clear_table', { 
-        table_name: tableName 
+        table_name: tableName as ValidTableName 
       });
       
       if (error) throw error;
