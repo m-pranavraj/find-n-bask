@@ -71,8 +71,8 @@ const Claims = () => {
         .from('item_claims')
         .select(`
           *,
-          claimer:profiles!item_claims_claimer_id_fkey(full_name, email),
-          item:found_items!item_claims_item_id_fkey(item_name, category)
+          claimer:profiles(full_name, email),
+          item:found_items(item_name, category)
         `)
         .eq('status', claimStatus)
         .order('created_at', { ascending: false });
@@ -80,10 +80,15 @@ const Claims = () => {
       if (error) throw error;
       
       if (data) {
-        // Convert and ensure types match the Claim interface
-        const typedClaims = data.map(claim => ({
-          ...claim,
+        // Type safe conversion of the data
+        const typedClaims: Claim[] = data.map(claim => ({
+          id: claim.id,
+          item_id: claim.item_id,
+          claimer_id: claim.claimer_id,
+          owner_description: claim.owner_description,
           status: claim.status as 'pending' | 'approved' | 'rejected',
+          created_at: claim.created_at,
+          updated_at: claim.updated_at,
           claimer: claim.claimer as ClaimerInfo,
           item: claim.item as ItemInfo
         }));
@@ -147,7 +152,7 @@ const Claims = () => {
         </div>
         
         <Tabs defaultValue="pending" onValueChange={(value) => setClaimStatus(value as 'pending' | 'approved' | 'rejected')}>
-          <TabsList>
+          <TabsList className="w-full md:w-auto">
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="approved">Approved</TabsTrigger>
             <TabsTrigger value="rejected">Rejected</TabsTrigger>
@@ -175,7 +180,7 @@ const Claims = () => {
                     <p className="text-muted-foreground">No {claimStatus} claims found</p>
                   </div>
                 ) : (
-                  <div className="border rounded-md overflow-x-auto">
+                  <div className="border rounded-md overflow-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -226,7 +231,7 @@ const Claims = () => {
               </DialogHeader>
               
               <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-[100px_1fr] gap-2">
+                <div className="grid grid-cols-[100px_1fr] md:grid-cols-[150px_1fr] gap-2">
                   <div className="font-medium">Item:</div>
                   <div>{selectedClaim.item?.item_name || 'Unknown item'}</div>
                   
@@ -237,7 +242,7 @@ const Claims = () => {
                   <div>{selectedClaim.claimer?.full_name || 'Unknown user'}</div>
                   
                   <div className="font-medium">Email:</div>
-                  <div>{selectedClaim.claimer?.email || 'N/A'}</div>
+                  <div className="break-all">{selectedClaim.claimer?.email || 'N/A'}</div>
                   
                   <div className="font-medium">Submitted:</div>
                   <div>{formatDate(selectedClaim.created_at)}</div>
@@ -256,7 +261,7 @@ const Claims = () => {
                 {selectedClaim.status === 'pending' && (
                   <div className="space-y-2 mt-4">
                     <div className="font-medium">Update Status:</div>
-                    <div className="flex gap-4 flex-wrap">
+                    <div className="flex flex-col sm:flex-row gap-4">
                       <Button 
                         variant="default" 
                         className="bg-green-600 hover:bg-green-700"

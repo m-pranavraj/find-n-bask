@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
   BarChart3, 
@@ -18,11 +18,13 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { AdminNavLink } from "@/components/admin/AdminNavLink";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { toast } from "sonner";
 
 const AdminNavbar = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUsername, setAdminUsername] = useState<string | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
   
   useEffect(() => {
     // Check if admin is authenticated
@@ -31,9 +33,22 @@ const AdminNavbar = () => {
     
     // Set admin username if available
     if (adminAuthenticated) {
-      setAdminUsername(localStorage.getItem("adminUsername") || "Admin");
+      const storedUsername = localStorage.getItem("adminUsername");
+      setAdminUsername(storedUsername || "Admin");
     }
   }, [location.pathname]); // Re-check when route changes
+
+  const handleLogout = () => {
+    localStorage.removeItem("adminAuthenticated");
+    localStorage.removeItem("adminLastLogin");
+    localStorage.removeItem("adminUsername");
+    
+    toast.success("Logged out successfully", {
+      description: "You have been logged out from the admin panel",
+    });
+    
+    navigate("/admin/login");
+  };
 
   if (!isAdmin) {
     return null;
@@ -43,13 +58,6 @@ const AdminNavbar = () => {
     { icon: <Shield className="h-4 w-4 mr-2" />, label: "Admin", href: "/admin/dashboard" },
     { icon: <Home className="h-4 w-4 mr-2" />, label: "Back to Site", href: "/" },
   ];
-  
-  const handleLogout = () => {
-    localStorage.removeItem("adminAuthenticated");
-    localStorage.removeItem("adminLastLogin");
-    localStorage.removeItem("adminUsername");
-    window.location.href = "/";
-  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -63,7 +71,7 @@ const AdminNavbar = () => {
           </SheetTrigger>
           <SheetContent side="left" className="pr-0">
             <div className="px-7">
-              <Link to="/" className="flex items-center gap-2 py-4">
+              <Link to="/admin/dashboard" className="flex items-center gap-2 py-4">
                 <Shield className="h-5 w-5" />
                 <span className="font-bold">Admin Panel</span>
               </Link>
@@ -122,7 +130,7 @@ const AdminNavbar = () => {
           </SheetContent>
         </Sheet>
         <div className="mr-4 hidden md:flex">
-          <Link to="/" className="mr-6 flex items-center space-x-2">
+          <Link to="/admin/dashboard" className="mr-6 flex items-center space-x-2">
             <Shield className="h-5 w-5" />
             <span className="hidden font-bold sm:inline-block">
               Find & Bask Admin

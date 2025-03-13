@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +11,6 @@ import { toast } from 'sonner';
 import { Loader2, Search, X, Download, Plus, Edit, Trash, RefreshCw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-// Define valid table names as a string literal type
 type TableName = 'profiles' | 'found_items' | 'item_claims' | 'item_messages' | 'lost_item_queries' | 'success_stories';
 
 interface TableData {
@@ -37,17 +35,15 @@ const Database = () => {
   const [filterColumn, setFilterColumn] = useState<string>('');
   const [filterValue, setFilterValue] = useState<string>('');
 
-  // Fetch available tables
   useEffect(() => {
     const fetchTables = async () => {
       try {
         const { data, error } = await supabase.rpc('get_tables');
         if (error) throw error;
         if (data) {
-          // Filter out only the tables we want to expose in the admin panel
-          const validTables = data.filter((table: string) => 
-            ['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'].includes(table)
-          );
+          const validTables = data.filter((table: { table_name: string }) => 
+            ['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'].includes(table.table_name)
+          ).map((table: { table_name: string }) => table.table_name);
           setTables(validTables);
         }
       } catch (error) {
@@ -61,7 +57,6 @@ const Database = () => {
     fetchTables();
   }, []);
 
-  // Fetch table data when table selection changes
   useEffect(() => {
     if (selectedTable) {
       fetchTableData();
@@ -71,21 +66,17 @@ const Database = () => {
     }
   }, [selectedTable, page, rowsPerPage, filterColumn, filterValue]);
 
-  // Fetch table data with pagination and filtering
   const fetchTableData = async () => {
     if (!selectedTable) return;
     
     setLoading(true);
     try {
-      // Create a query builder
       let query = supabase.from(selectedTable).select('*', { count: 'exact' });
       
-      // Apply filtering if set
       if (filterColumn && filterValue) {
         query = query.ilike(filterColumn, `%${filterValue}%`);
       }
       
-      // Apply pagination
       const from = page * rowsPerPage;
       const to = from + rowsPerPage - 1;
       query = query.range(from, to);
@@ -97,12 +88,10 @@ const Database = () => {
       if (data) {
         setTableData(data);
         
-        // Extract columns from the first row
         if (data.length > 0) {
           setColumns(Object.keys(data[0]));
         }
         
-        // Set total count for pagination
         if (count !== null) {
           setTotalRows(count);
         }
@@ -115,9 +104,7 @@ const Database = () => {
     }
   };
 
-  // Handle table selection
   const handleTableSelect = (tableName: string) => {
-    // Validate that the selected table is one of our accepted table names
     if (['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'].includes(tableName)) {
       setSelectedTable(tableName as TableName);
       setPage(0);
@@ -128,19 +115,16 @@ const Database = () => {
     }
   };
 
-  // Initialize edit dialog
   const handleEditClick = (row: TableData) => {
     setCurrentRow(row);
     setEditedRow({...row});
     setEditDialogOpen(true);
   };
 
-  // Handle row updates
   const handleUpdateRow = async () => {
     if (!selectedTable || !currentRow) return;
     
     try {
-      // Find the primary key (usually 'id')
       const primaryKey = columns.includes('id') ? 'id' : columns[0];
       
       const { error } = await supabase
@@ -159,7 +143,6 @@ const Database = () => {
     }
   };
 
-  // Initialize add dialog
   const handleAddClick = () => {
     const emptyRow: TableData = {};
     columns.forEach(col => {
@@ -171,14 +154,13 @@ const Database = () => {
     setAddDialogOpen(true);
   };
 
-  // Handle row insertion
   const handleAddRow = async () => {
     if (!selectedTable) return;
     
     try {
       const { error } = await supabase
         .from(selectedTable)
-        .insert(newRow);
+        .insert([newRow]);
         
       if (error) throw error;
       
@@ -191,7 +173,6 @@ const Database = () => {
     }
   };
 
-  // Handle row deletion
   const handleDeleteRow = async (row: TableData) => {
     if (!selectedTable) return;
     
@@ -200,7 +181,6 @@ const Database = () => {
     }
     
     try {
-      // Find the primary key (usually 'id')
       const primaryKey = columns.includes('id') ? 'id' : columns[0];
       
       const { error } = await supabase
@@ -218,17 +198,34 @@ const Database = () => {
     }
   };
 
-  // Export table data as CSV
+  const clearTableData = async (tableName: TableName) => {
+    if (!confirm(`WARNING: This will delete ALL data from the ${tableName} table. This action cannot be undone. Are you sure?`)) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase.rpc('admin_clear_table', { 
+        table_name: tableName 
+      });
+      
+      if (error) throw error;
+      
+      toast.success(`All data from ${tableName} has been cleared`);
+      fetchTableData();
+    } catch (error) {
+      console.error(`Error clearing table ${tableName}:`, error);
+      toast.error('Failed to clear table data');
+    }
+  };
+
   const exportToCSV = () => {
     if (!tableData.length || !columns.length) return;
     
-    // Create CSV content
     const csvContent = [
       columns.join(','),
       ...tableData.map(row => 
         columns.map(col => {
           const value = row[col];
-          // Handle different data types
           if (value === null || value === undefined) return '';
           if (typeof value === 'object') return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
           return `"${String(value).replace(/"/g, '""')}"`;
@@ -236,7 +233,6 @@ const Database = () => {
       )
     ].join('\n');
     
-    // Create and download the file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -248,7 +244,37 @@ const Database = () => {
     document.body.removeChild(link);
   };
 
-  // Filter the data
+  const resetAllUserData = async () => {
+    if (!confirm('WARNING: This will delete ALL user data from all tables. This action cannot be undone. Are you sure?')) {
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const tables: TableName[] = ['item_claims', 'item_messages', 'found_items', 'lost_item_queries', 'success_stories'];
+      
+      for (const table of tables) {
+        await supabase.from(table).delete();
+        toast.success(`Cleared ${table} data`);
+      }
+      
+      const { error } = await supabase.rpc('admin_reset_profiles');
+      
+      if (error) throw error;
+      
+      toast.success('All user data has been reset successfully');
+      
+      if (selectedTable) {
+        fetchTableData();
+      }
+    } catch (error) {
+      console.error('Error resetting user data:', error);
+      toast.error('Failed to reset user data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredData = tableData.filter(row => {
     if (!searchTerm) return true;
     
@@ -354,7 +380,6 @@ const Database = () => {
                   </div>
                 </div>
                 
-                {/* Filter controls */}
                 {selectedTable && columns.length > 0 && (
                   <div className="flex flex-wrap gap-4 mb-4">
                     <div className="w-full md:w-auto">
@@ -447,7 +472,6 @@ const Database = () => {
                   </div>
                 )}
                 
-                {/* Pagination controls */}
                 {selectedTable && totalRows > 0 && (
                   <div className="flex justify-between items-center mt-4">
                     <div className="text-sm text-muted-foreground">
@@ -492,11 +516,7 @@ const Database = () => {
                         </p>
                         <Button 
                           variant="destructive"
-                          onClick={() => {
-                            if (confirm('WARNING: This will delete ALL user data from the database. This action cannot be undone. Are you sure?')) {
-                              toast.success('Instructions for resetting data will be shown below');
-                            }
-                          }}
+                          onClick={resetAllUserData}
                         >
                           Clear All User Data
                         </Button>
@@ -512,7 +532,6 @@ const Database = () => {
                           onClick={() => {
                             toast.success('Initiated database backup. Files will download shortly.');
                             tables.forEach(table => {
-                              // Simulate download of each table
                               setTimeout(() => {
                                 if (['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'].includes(table)) {
                                   handleTableSelect(table);
@@ -526,6 +545,27 @@ const Database = () => {
                         </Button>
                       </div>
                     </div>
+                    
+                    <div className="mt-6">
+                      <h3 className="font-medium mb-4">Clear Individual Tables</h3>
+                      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                        {['profiles', 'found_items', 'item_claims', 'item_messages', 'lost_item_queries', 'success_stories'].map((table) => (
+                          <div key={table} className="border rounded-lg p-3">
+                            <h4 className="font-medium">{table}</h4>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Delete all data from this table
+                            </p>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => clearTableData(table as TableName)}
+                            >
+                              Clear Table
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -533,7 +573,6 @@ const Database = () => {
           </CardContent>
         </Card>
         
-        {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -547,7 +586,6 @@ const Database = () => {
                 <div key={column} className="grid grid-cols-4 items-center gap-4">
                   <label className="text-right font-medium text-sm">
                     {column}
-                    {/* Mark required fields */}
                     {!['id', 'created_at', 'updated_at'].includes(column) && ' *'}
                   </label>
                   <Input
@@ -570,7 +608,6 @@ const Database = () => {
           </DialogContent>
         </Dialog>
         
-        {/* Add Dialog */}
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>

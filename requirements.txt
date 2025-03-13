@@ -1,0 +1,49 @@
+
+# Project Dependencies
+# Find & Bask - Lost & Found Web Application
+
+# Core Web Framework
+nodejs>=18.0.0
+npm>=8.0.0
+
+# Frontend Dependencies
+reactjs==18.3.1
+react-dom==18.3.1
+typescript==5.3.3
+tailwindcss==3.3.3
+vite==5.0.0
+react-router-dom==6.26.2
+framer-motion==11.18.2
+zod==3.23.8
+
+# UI Component Libraries
+shadcn-ui==0.5.0
+lucide-react==0.462.0
+tailwind-merge==2.5.2
+tailwindcss-animate==1.0.7
+
+# Form Management
+react-hook-form==7.53.0
+@hookform/resolvers==3.9.0
+
+# Backend & Database
+supabase-js==2.49.1
+tanstack-react-query==5.56.2
+date-fns==3.6.0
+uuid==11.1.0
+
+# Notifications
+sonner==1.5.0
+
+# Data Visualization
+recharts==2.12.7
+
+# Deployment Requirements
+node>=18.0.0
+npm>=8.0.0
+
+# Environment Setup
+# 1. Node.js (v18 or higher)
+# 2. npm (v8 or higher)
+# 3. Git
+# 4. Supabase account

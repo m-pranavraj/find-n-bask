@@ -1,197 +1,194 @@
 
-# Find & Bask - Lost and Found Application
+# Find & Bask - Lost & Found Web Application
 
-Find & Bask is a comprehensive lost and found management application that helps connect people who have lost items with those who have found them. This application simplifies the process of reporting, searching for, and claiming lost items.
+Find & Bask is a comprehensive lost and found web application that allows users to report found items, search for lost items, and connect with item owners through a secure messaging system.
 
 ## Features
 
-- **User Authentication**: Secure signup and login process
-- **Post Found Items**: Easily report and post items you've found
-- **Search Lost Items**: Search for lost items using various filters
-- **Claim Verification**: Secure process for verifying ownership claims
-- **Messaging System**: Built-in chat to facilitate handovers
+- **User Authentication**: Secure login/signup with email
+- **Found Item Reporting**: Upload images and details of found items
+- **Lost Item Search**: Search for lost items with filtering options
+- **Claims System**: Create and manage claims on found items
+- **Messaging System**: Real-time messaging between item finders and owners
 - **Admin Panel**: Complete database management and oversight
-- **Success Stories**: Share and view successful item returns
+- **Responsive Design**: Works on mobile, tablet, and desktop
+- **Dark Mode Support**: Toggle between light and dark themes
 
 ## Tech Stack
 
 - **Frontend**: React, TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: Supabase (PostgreSQL, Auth, Storage, Edge Functions)
-- **State Management**: React Context API, React Query
-- **Forms**: React Hook Form with Zod validation
-- **UI Components**: Radix UI, Lucide icons
-- **Build Tool**: Vite
+- **Backend**: Supabase (PostgreSQL, Auth, Storage, Realtime)
+- **State Management**: React Query, Context API
+- **Forms**: React Hook Form, Zod validation
+- **Routing**: React Router
+- **UI Components**: Lucide icons, Framer Motion animations
+- **Notifications**: Sonner toast notifications
+- **Deployment**: Vercel, Netlify, or custom hosting
 
-## Project Setup Guide
+## Getting Started
 
 ### Prerequisites
 
-- Node.js (v16+)
-- npm, yarn, or pnpm
-- Supabase account (for backend functionality)
+- Node.js (v18 or higher)
+- npm or bun
+- Git
+- Supabase account
 
 ### Installation
 
-1. **Clone the repository**
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/find-and-bask.git
+   cd find-and-bask
+   ```
 
-```bash
-git clone https://github.com/your-username/find-and-bask.git
-cd find-and-bask
-```
+2. Install dependencies:
+   ```bash
+   npm install
+   # or if using bun
+   bun install
+   ```
 
-2. **Install dependencies**
+3. Set up environment variables:
+   Create a `.env` file in the root directory with the following variables:
+   ```
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-```bash
-npm install
-# or
-yarn install
-# or
-pnpm install
-```
+4. Set up Supabase:
+   - Create a new Supabase project
+   - Run the SQL migrations from the `supabase/migrations/` folder
+   - Set up storage buckets for item images
 
-3. **Environment Variables**
+5. Start the development server:
+   ```bash
+   npm run dev
+   # or if using bun
+   bun run dev
+   ```
 
-Create a `.env` file in the root directory and add your Supabase credentials:
-
-```
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_KEY=your_supabase_anon_key
-```
-
-4. **Start the development server**
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
-
-The application will be available at `http://localhost:5173`.
+6. The application should now be running at `http://localhost:5173/`
 
 ### Supabase Setup
 
-1. **Create a new Supabase project** from the [Supabase Dashboard](https://supabase.com/dashboard)
+1. Create a new Supabase project
+2. Run the migration files in the `supabase/migrations/` directory
+3. Set up the required tables:
+   - profiles
+   - found_items
+   - item_claims
+   - item_messages
+   - lost_item_queries
+   - success_stories
 
-2. **Run migrations** to set up the database schema
-   - Navigate to the SQL Editor in your Supabase Dashboard
-   - Copy and run the SQL migration files from `supabase/migrations/` one by one
+4. Enable the Supabase Authentication service (Email/Password)
+5. Create storage buckets for images
 
-3. **Set up storage buckets**
-   - Create a `found-item-images` bucket in your Supabase project
-   - Enable public access if you want images to be viewable without authentication
-
-4. **Configure authentication providers**
-   - Navigate to Authentication > Providers in your Supabase Dashboard
-   - Configure Email/Password authentication
-   - Optional: Enable additional providers like Google, Facebook, etc.
-
-5. **Update Supabase credentials**
-   - Get your Supabase URL and anon key from your project settings
-   - Update them in the `.env` file
-
-## Deployment Guide
+## Deployment
 
 ### Deploying to Vercel
 
-1. **Create a Vercel account** if you don't have one
-
-2. **Install Vercel CLI** (optional)
-
-```bash
-npm install -g vercel
-```
-
-3. **Deploy your application**
-
-```bash
-# Using Vercel CLI
-vercel
-
-# Or connect your GitHub repository from the Vercel dashboard
-```
-
-4. **Set environment variables in Vercel**
-   - Navigate to your project settings in Vercel
-   - Add the Supabase URL and anon key as environment variables
+1. Create a Vercel account and connect your GitHub repository
+2. Set up the environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+3. Deploy the application
 
 ### Deploying to Netlify
 
-1. **Create a Netlify account** if you don't have one
+1. Create a Netlify account and connect your GitHub repository
+2. Set up the environment variables
+3. Deploy the application
 
-2. **Deploy your application**
-   - Connect your GitHub repository
-   - Select the repository containing your project
-   - Configure build settings: 
-     - Build command: `npm run build` or `yarn build`
-     - Publish directory: `dist`
+### Custom Server Deployment
 
-3. **Set environment variables in Netlify**
-   - Navigate to your site settings in Netlify
-   - Go to Build & deploy > Environment
-   - Add the Supabase URL and anon key as environment variables
+1. Build the application:
+   ```bash
+   npm run build
+   # or if using bun
+   bun run build
+   ```
 
-## Admin Panel Access
+2. Deploy the generated `dist` folder to your web server
 
-To access the admin panel, navigate to `/admin/login` and use the following credentials:
+## Admin Panel
 
-- **Username**: admin
-- **Password**: FindBask@2023
+The admin panel provides complete control over the application's data and functionality.
 
-The admin panel provides:
+### Admin Login
 
-- **Dashboard**: Overview of system statistics
-- **Database Management**: View and modify all tables
-- **User Management**: Manage user accounts
-- **Item Claims**: Review and approve item claims
-- **Found Items**: Manage reported found items
+- URL: `/admin/login`
+- Default credentials:
+  - Username: `admin`
+  - Password: `FindBask@2023`
 
-## Data Reset Instructions
+### Admin Features
 
-To reset user data without affecting the database schema:
+- **Dashboard**: View statistics and system health
+- **User Management**: View, edit, and manage user accounts
+- **Items Management**: Manage found items
+- **Claims Management**: Review and respond to item claims
+- **Database Management**: Direct access to database tables
+- **System Settings**: Configure application settings
 
-1. **Access the Admin Panel** (`/admin/login`)
-2. **Navigate to Database Management**
-3. **Select the "Manage Database" tab**
-4. **Use the "Clear All User Data" button**
+### Database Management
 
-Alternatively, you can execute these SQL commands in the Supabase SQL Editor:
+The admin panel includes comprehensive database management tools:
+
+1. **View and Edit Data**: Browse, search, and modify records
+2. **Add New Records**: Create new entries in any table
+3. **Delete Records**: Remove unwanted data
+4. **Export Data**: Download table data as CSV
+5. **Data Reset Tools**: Clear tables or reset all user data
+
+### Resetting User Data
+
+To reset all user data without affecting the database schema:
+
+1. Log in to the admin panel
+2. Navigate to Database Management
+3. Click on the "Manage" tab
+4. Use the "Reset User Data" button to clear all user-related data
+
+Alternatively, you can use the database function directly:
 
 ```sql
--- Truncate user-related tables (preserves structure but removes data)
-TRUNCATE TABLE public.item_messages CASCADE;
-TRUNCATE TABLE public.item_claims CASCADE;
-TRUNCATE TABLE public.found_items CASCADE;
-TRUNCATE TABLE public.lost_item_queries CASCADE;
-TRUNCATE TABLE public.success_stories CASCADE;
--- Keep the profiles table if you want to preserve user accounts
+SELECT admin_reset_profiles();
 ```
 
-## Troubleshooting
+## Project Structure
 
-### Common Issues
+```
+find-and-bask/
+├── public/             # Static assets
+├── src/                # Source code
+│   ├── components/     # UI components
+│   ├── contexts/       # React contexts
+│   ├── hooks/          # Custom hooks
+│   ├── integrations/   # External integrations
+│   ├── lib/            # Utilities and helpers
+│   ├── pages/          # Page components
+│   │   ├── admin/      # Admin panel pages
+│   │   └── ...         # Public pages
+│   ├── App.tsx         # Main app component
+│   └── main.tsx        # Application entry point
+├── supabase/           # Supabase configuration
+│   ├── functions/      # Edge functions
+│   └── migrations/     # Database migrations
+└── ...                 # Configuration files
+```
 
-1. **Storage Bucket Access Issues**
-   - Ensure your storage bucket has the correct permissions
-   - Check if you've enabled public access for found-item-images
+## Contributing
 
-2. **Authentication Problems**
-   - Verify your Supabase URL and anon key are correct
-   - Check your browser console for auth-related errors
-
-3. **Database Connection Issues**
-   - Ensure your IP is allowed in Supabase settings
-   - Check if your database is paused (free tier limitation)
-
-4. **Upload Issues**
-   - Check file size limits (max 5MB per file)
-   - Verify the storage bucket exists
-
-### Support
-
-For additional support, please create an issue in the project repository or contact the project maintainers.
+1. Fork the repository
+2. Create your feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add some amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For support, please contact us at support@findandbask.com or open an issue on GitHub.
