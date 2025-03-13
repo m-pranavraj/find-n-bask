@@ -137,9 +137,9 @@ const Database = () => {
         throw new Error(`Invalid table name: ${tableName}`);
       }
       
-      // After validation, TypeScript knows tableName is a ValidTableName
+      // After validation, we can use a type assertion for the supabase client
       const { data, error } = await supabase
-        .from(tableName)
+        .from(tableName as ValidTableName)
         .select('*')
         .limit(100);
 
@@ -189,7 +189,7 @@ const Database = () => {
       
       // Check that selectedTable is valid before fetching data
       if (isValidTable(selectedTable)) {
-        fetchTableData(selectedTable);
+        fetchTableData(selectedTable as ValidTableName);
       }
     } catch (error) {
       console.error(`Error clearing table ${selectedTable}:`, error);
