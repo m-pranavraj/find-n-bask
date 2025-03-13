@@ -31,9 +31,9 @@ export const fetchTableData = async (tableName: string): Promise<{
       throw new Error(`Invalid table name: ${tableName}`);
     }
     
-    // Use type assertion here to tell TypeScript this is safe
+    // Use the validated table name with the correct type
     const { data, error } = await supabase
-      .from(tableName as ValidTableName)
+      .from(tableName)
       .select('*')
       .limit(100);
 
