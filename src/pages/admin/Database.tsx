@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +52,7 @@ interface TableNameResponse {
   table_name: string;
 }
 
+// Define valid table names as a const array and type to use with Supabase
 const VALID_TABLES = [
   'found_items',
   'item_claims',
@@ -60,12 +62,15 @@ const VALID_TABLES = [
   'success_stories'
 ] as const;
 
+// Use a type union for valid table names
 type ValidTableName = typeof VALID_TABLES[number];
 
+// Type guard to validate table names
 const isValidTable = (table: string): table is ValidTableName => {
   return VALID_TABLES.includes(table as ValidTableName);
 };
 
+// Strongly typed test data interfaces
 interface TestFoundItem {
   item_name: string;
   category: string;
@@ -82,8 +87,6 @@ interface TestProfile {
   location: string;
   bio: string;
 }
-
-type TestData = TestFoundItem | TestProfile;
 
 const Database = () => {
   const [tables, setTables] = useState<string[]>([]);
@@ -129,10 +132,12 @@ const Database = () => {
   const fetchTableData = async (tableName: string) => {
     setIsLoading(true);
     try {
+      // Use the type guard to ensure tableName is a valid table
       if (!isValidTable(tableName)) {
         throw new Error(`Invalid table name: ${tableName}`);
       }
       
+      // Now supabase.from() will accept the validated tableName
       const { data, error } = await supabase
         .from(tableName)
         .select('*')
@@ -182,7 +187,10 @@ const Database = () => {
         toast.success(`Table ${selectedTable} cleared successfully`);
       }
       
-      fetchTableData(selectedTable);
+      // Fetch the data again with the validated table name
+      if (isValidTable(selectedTable)) {
+        fetchTableData(selectedTable);
+      }
     } catch (error) {
       console.error(`Error clearing table ${selectedTable}:`, error);
       toast.error("Failed to clear table data");
@@ -197,6 +205,11 @@ const Database = () => {
     
     setIsLoading(true);
     try {
+      // Validate table name before proceeding
+      if (!isValidTable(selectedTable)) {
+        throw new Error(`Invalid table name: ${selectedTable}`);
+      }
+      
       if (selectedTable === 'found_items') {
         const testData: TestFoundItem = {
           item_name: "Test Laptop",
@@ -236,6 +249,7 @@ const Database = () => {
       
       toast.success(`Test data inserted into ${selectedTable}`);
       
+      // Refresh table data with the validated table name
       fetchTableData(selectedTable);
     } catch (error) {
       console.error(`Error inserting test data into ${selectedTable}:`, error);
