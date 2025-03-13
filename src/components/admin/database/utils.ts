@@ -31,12 +31,14 @@ export interface TableData {
 // Fetch available tables from Supabase
 export const fetchTables = async (): Promise<string[]> => {
   try {
-    const { data, error } = await supabase.rpc('get_tables');
+    // Explicitly type the response to avoid TypeScript errors
+    const { data, error } = await supabase.rpc('get_tables') as { data: TableNameResponse[] | null, error: any };
     
     if (error) throw error;
 
     if (data) {
-      return data.map(item => (item as TableNameResponse).table_name);
+      // Now TypeScript understands that data is an array of TableNameResponse objects
+      return data.map(item => item.table_name);
     }
     return [];
   } catch (error) {
