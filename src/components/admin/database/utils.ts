@@ -31,12 +31,12 @@ export interface TableData {
 // Fetch available tables from Supabase
 export const fetchTables = async (): Promise<string[]> => {
   try {
-    const { data, error } = await supabase.rpc('get_tables') as { data: TableNameResponse[] | null, error: any };
+    const { data, error } = await supabase.rpc('get_tables');
     
     if (error) throw error;
 
     if (data) {
-      return data.map(item => item.table_name);
+      return data.map(item => (item as TableNameResponse).table_name);
     }
     return [];
   } catch (error) {
