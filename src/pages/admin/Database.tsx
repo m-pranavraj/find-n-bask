@@ -52,7 +52,7 @@ interface TableNameResponse {
   table_name: string;
 }
 
-// Define valid table names as a const array and type to use with Supabase
+// Define valid table names as a const array to use with Supabase
 const VALID_TABLES = [
   'found_items',
   'item_claims',
@@ -132,12 +132,12 @@ const Database = () => {
   const fetchTableData = async (tableName: string) => {
     setIsLoading(true);
     try {
-      // Use the type guard to ensure tableName is a valid table
+      // Type guard to ensure tableName is a valid table before using it with supabase
       if (!isValidTable(tableName)) {
         throw new Error(`Invalid table name: ${tableName}`);
       }
       
-      // Now supabase.from() will accept the validated tableName
+      // Now tableName is narrowed to ValidTableName type
       const { data, error } = await supabase
         .from(tableName)
         .select('*')
@@ -187,7 +187,7 @@ const Database = () => {
         toast.success(`Table ${selectedTable} cleared successfully`);
       }
       
-      // Fetch the data again with the validated table name
+      // Validate the table name again before fetching data
       if (isValidTable(selectedTable)) {
         fetchTableData(selectedTable);
       }
@@ -205,7 +205,7 @@ const Database = () => {
     
     setIsLoading(true);
     try {
-      // Validate table name before proceeding
+      // Validate the table name before proceeding
       if (!isValidTable(selectedTable)) {
         throw new Error(`Invalid table name: ${selectedTable}`);
       }
@@ -249,7 +249,7 @@ const Database = () => {
       
       toast.success(`Test data inserted into ${selectedTable}`);
       
-      // Refresh table data with the validated table name
+      // Refresh table data
       fetchTableData(selectedTable);
     } catch (error) {
       console.error(`Error inserting test data into ${selectedTable}:`, error);
