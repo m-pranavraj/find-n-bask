@@ -52,7 +52,7 @@ interface TableNameResponse {
   table_name: string;
 }
 
-// Define valid table names as a const array to use with Supabase
+// Define a const array of valid table names to use with Supabase
 const VALID_TABLES = [
   'found_items',
   'item_claims',
@@ -62,15 +62,15 @@ const VALID_TABLES = [
   'success_stories'
 ] as const;
 
-// Use a type union for valid table names
+// Create a type from the array values
 type ValidTableName = typeof VALID_TABLES[number];
 
-// Type guard to validate table names
-const isValidTable = (table: string): table is ValidTableName => {
-  return VALID_TABLES.includes(table as ValidTableName);
-};
+// Type guard function to validate if a string is a valid table name
+function isValidTable(table: string): table is ValidTableName {
+  return (VALID_TABLES as readonly string[]).includes(table);
+}
 
-// Strongly typed test data interfaces
+// Type definitions for test data
 interface TestFoundItem {
   item_name: string;
   category: string;
@@ -132,12 +132,12 @@ const Database = () => {
   const fetchTableData = async (tableName: string) => {
     setIsLoading(true);
     try {
-      // Type guard to ensure tableName is a valid table before using it with supabase
+      // Validate the table name before using it with supabase
       if (!isValidTable(tableName)) {
         throw new Error(`Invalid table name: ${tableName}`);
       }
       
-      // Now tableName is narrowed to ValidTableName type
+      // After validation, TypeScript knows tableName is a ValidTableName
       const { data, error } = await supabase
         .from(tableName)
         .select('*')
@@ -187,7 +187,7 @@ const Database = () => {
         toast.success(`Table ${selectedTable} cleared successfully`);
       }
       
-      // Validate the table name again before fetching data
+      // Check that selectedTable is valid before fetching data
       if (isValidTable(selectedTable)) {
         fetchTableData(selectedTable);
       }
@@ -205,7 +205,7 @@ const Database = () => {
     
     setIsLoading(true);
     try {
-      // Validate the table name before proceeding
+      // Validate table name before proceeding
       if (!isValidTable(selectedTable)) {
         throw new Error(`Invalid table name: ${selectedTable}`);
       }
