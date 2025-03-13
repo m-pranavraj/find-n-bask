@@ -16,15 +16,22 @@ const Database = () => {
   useEffect(() => {
     if (selectedTable) {
       handleFetchTableData(selectedTable);
+    } else {
+      setIsLoading(false);
     }
   }, [selectedTable]);
 
   const handleFetchTableData = async (tableName: string) => {
     setIsLoading(true);
     try {
+      console.log("Fetching data for table:", tableName);
       const result = await fetchTableData(tableName);
+      console.log("Data fetched:", result);
       setColumns(result.columns);
       setTableData(result.data);
+    } catch (error) {
+      console.error("Error fetching table data:", error);
+      toast.error(`Failed to fetch data for ${tableName}`);
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +79,7 @@ const Database = () => {
           <TableSelector 
             selectedTable={selectedTable}
             setSelectedTable={setSelectedTable}
-            onRefresh={() => handleFetchTableData(selectedTable)}
+            onRefresh={() => selectedTable && handleFetchTableData(selectedTable)}
             onClear={handleClearTable}
             onInsertTestData={handleInsertTestData}
             isLoading={isLoading}
