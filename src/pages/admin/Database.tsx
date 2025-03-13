@@ -137,7 +137,7 @@ const Database = () => {
         throw new Error(`Invalid table name: ${tableName}`);
       }
       
-      // After validation, we can use a type assertion for the supabase client
+      // Use type assertion here to tell TypeScript this is safe
       const { data, error } = await supabase
         .from(tableName as ValidTableName)
         .select('*')
@@ -178,6 +178,11 @@ const Database = () => {
         
         toast.success("Profiles reset successfully (admin users preserved)");
       } else {
+        // Validate table name before using in RPC call
+        if (!isValidTable(selectedTable)) {
+          throw new Error(`Invalid table name: ${selectedTable}`);
+        }
+        
         const { error } = await supabase.rpc('admin_clear_table', { 
           table_name: selectedTable 
         });
