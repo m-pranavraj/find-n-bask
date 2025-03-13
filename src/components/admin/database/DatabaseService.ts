@@ -31,7 +31,7 @@ export const fetchTableData = async (tableName: string): Promise<{
       throw new Error(`Invalid table name: ${tableName}`);
     }
     
-    // Use the validated table name with the correct type
+    // Since isValidTable is a type guard, tableName is now ValidTableName
     const { data, error } = await supabase
       .from(tableName)
       .select('*')
