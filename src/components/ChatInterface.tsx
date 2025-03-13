@@ -42,6 +42,8 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
     const fetchMessages = async () => {
       setIsLoading(true);
       try {
+        console.log("Fetching messages for item:", itemId, "user:", user.id);
+        
         const { data, error } = await supabase
           .from('item_messages')
           .select('*')
@@ -49,7 +51,12 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
           .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
           .order('created_at', { ascending: true });
           
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching messages:", error);
+          throw error;
+        }
+        
+        console.log("Messages loaded:", data?.length || 0);
         setMessages(data || []);
         
         // Mark received messages as read
@@ -59,6 +66,7 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
             .map(msg => msg.id);
             
           if (unreadMessageIds.length > 0) {
+            console.log("Marking messages as read:", unreadMessageIds.length);
             await supabase
               .from('item_messages')
               .update({ is_read: true })
@@ -67,6 +75,7 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
         }
       } catch (error) {
         console.error("Error loading messages:", error);
+        toast.error("Could not load messages");
       } finally {
         setIsLoading(false);
       }
@@ -75,8 +84,9 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
     fetchMessages();
     
     // Set up real-time subscription
-    const subscription = supabase
-      .channel('item_messages_channel')
+    console.log("Setting up real-time subscription for item_messages");
+    const channel = supabase
+      .channel('item_messages_changes')
       .on('postgres_changes', 
         { 
           event: 'INSERT', 
@@ -85,22 +95,38 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
           filter: `item_id=eq.${itemId}`
         }, 
         (payload) => {
+          console.log("Received real-time message:", payload);
           const newMessage = payload.new as Message;
-          setMessages(prev => [...prev, newMessage]);
           
-          // If the message is for the current user, mark it as read
-          if (newMessage.receiver_id === user.id) {
-            supabase
-              .from('item_messages')
-              .update({ is_read: true })
-              .eq('id', newMessage.id);
+          // Check if this message is for the current conversation
+          if (
+            (newMessage.sender_id === user.id || newMessage.receiver_id === user.id) &&
+            newMessage.item_id === itemId
+          ) {
+            console.log("Adding new message to state");
+            setMessages(prev => [...prev, newMessage]);
+            
+            // If the message is for the current user, mark it as read
+            if (newMessage.receiver_id === user.id) {
+              console.log("Marking new message as read");
+              supabase
+                .from('item_messages')
+                .update({ is_read: true })
+                .eq('id', newMessage.id)
+                .then(({ error }) => {
+                  if (error) console.error("Error marking message as read:", error);
+                });
+            }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Subscription status:", status);
+      });
       
     return () => {
-      supabase.removeChannel(subscription);
+      console.log("Cleaning up real-time subscription");
+      supabase.removeChannel(channel);
     };
   }, [user, itemId]);
   
@@ -110,22 +136,43 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
   }, [messages]);
   
   const sendMessage = async () => {
-    if (!user || !newMessage.trim() || !recipientId) return;
+    if (!user || !newMessage.trim() || !recipientId) {
+      console.log("Cannot send message:", { 
+        userExists: !!user,
+        messageContent: newMessage.trim(), 
+        recipientExists: !!recipientId 
+      });
+      return;
+    }
     
+    console.log("Sending message to:", recipientId, "about item:", itemId);
     setIsSending(true);
     try {
-      const { error } = await supabase
+      const messageToSend = {
+        item_id: itemId,
+        sender_id: user.id,
+        receiver_id: recipientId,
+        content: newMessage.trim(),
+        is_read: false
+      };
+      
+      console.log("Message data:", messageToSend);
+      
+      const { data, error } = await supabase
         .from('item_messages')
-        .insert({
-          item_id: itemId,
-          sender_id: user.id,
-          receiver_id: recipientId,
-          content: newMessage.trim()
-        });
+        .insert(messageToSend)
+        .select()
+        .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error sending message:", error);
+        throw error;
+      }
+      
+      console.log("Message sent successfully:", data);
       setNewMessage('');
     } catch (error: any) {
+      console.error("Failed to send message:", error);
       toast.error("Failed to send message", {
         description: error.message || "Please try again"
       });
@@ -169,7 +216,7 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
                     : 'bg-muted'
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
+                <p className="text-sm break-words">{message.content}</p>
                 <span className="text-xs opacity-70 mt-1 block text-right">
                   {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
@@ -180,20 +227,20 @@ const ChatInterface = ({ itemId, recipientId, claimId }: ChatInterfaceProps) => 
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="flex items-end gap-2">
+      <div className="flex flex-col sm:flex-row items-end gap-2">
         <Textarea
           placeholder="Type your message..."
           value={newMessage}
           onChange={e => setNewMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="min-h-[80px] resize-none"
+          className="min-h-[80px] resize-none flex-1"
           disabled={isSending}
         />
         <Button 
           size="icon" 
           onClick={sendMessage} 
           disabled={isSending || !newMessage.trim()}
-          className="h-10 w-10"
+          className="h-10 w-10 sm:mt-0 mt-2"
         >
           {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>

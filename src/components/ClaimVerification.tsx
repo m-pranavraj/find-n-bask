@@ -45,6 +45,7 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
   const [isUploading, setIsUploading] = useState(false);
   const [viewFullImages, setViewFullImages] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Initialize form
   const form = useForm<VerificationFormValues>({
@@ -119,25 +120,35 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
   
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user) {
+      console.log("No file selected or user not logged in");
+      return;
+    }
+
+    // Reset previous upload errors
+    setUploadError(null);
 
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("File too large", { description: "Maximum file size is 5MB" });
+      setUploadError("File too large. Maximum size is 5MB.");
       return;
     }
 
     // Check file type
     if (!file.type.startsWith('image/') && type === 'photo') {
       toast.error("Invalid file type", { description: "Please upload an image file" });
+      setUploadError("Invalid file type. Please upload an image file.");
       return;
     }
 
     if (!file.type.includes('pdf') && !file.type.includes('image/') && type === 'receipt') {
       toast.error("Invalid file type", { description: "Please upload a PDF or image file" });
+      setUploadError("Invalid file type. Please upload a PDF or image file.");
       return;
     }
 
+    console.log("Starting file upload process...");
     setIsUploading(true);
     
     try {
@@ -145,17 +156,27 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
       const folderPath = `claims/${user.id}/${itemId}`;
       const filePath = `${folderPath}/${Date.now()}-${file.name}`;
       
+      console.log("Uploading file to path:", filePath);
       const { error: uploadError, data } = await supabase.storage
         .from('found-item-images')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
         
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw uploadError;
+      }
       
+      console.log("Upload successful, getting public URL");
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('found-item-images')
         .getPublicUrl(filePath);
         
+      console.log("Public URL obtained:", publicUrl);
+      
       // Add to uploaded files
       setUploadedFiles(prev => [...prev, {
         type,
@@ -173,6 +194,7 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
       event.target.value = '';
     } catch (error: any) {
       console.error("Error uploading file:", error);
+      setUploadError(error.message || "File upload failed");
       toast.error("Error uploading file", {
         description: error.message || "Please try again"
       });
@@ -334,7 +356,7 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
                 </div>
               
                 <Tabs defaultValue="description" className="w-full">
-                  <TabsList className="grid grid-cols-3 mb-4">
+                  <TabsList className="grid grid-cols-3 mb-4 w-full">
                     <TabsTrigger value="description">Description</TabsTrigger>
                     <TabsTrigger value="photos">Photos</TabsTrigger>
                     <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -421,23 +443,38 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
                             <Camera className="h-8 w-8 text-primary/60 mb-2" />
                             <span className="text-sm text-primary/60">Upload photos</span>
                             <span className="text-xs text-muted-foreground">JPG, PNG, GIF up to 5MB</span>
-                            <Input
-                              id="photo-upload"
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleFileUpload(e, 'photo')}
-                              disabled={isUploading}
-                            />
                           </Label>
+                          <Input
+                            id="photo-upload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleFileUpload(e, 'photo')}
+                            disabled={isUploading}
+                          />
                         </div>
+                        
+                        {/* Display file upload errors */}
+                        {uploadError && (
+                          <div className="mt-2 text-sm text-destructive">
+                            {uploadError}
+                          </div>
+                        )}
+                        
+                        {/* Display loading indicator */}
+                        {isUploading && (
+                          <div className="mt-4 flex items-center justify-center">
+                            <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                            <span className="text-sm">Uploading...</span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Preview uploaded photos */}
                       {uploadedFiles.filter(file => file.type === 'photo').length > 0 && (
                         <div className="space-y-2">
                           <h4 className="text-sm font-medium">Uploaded Photos</h4>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                             {uploadedFiles
                               .filter(file => file.type === 'photo')
                               .map((file, index) => (
@@ -490,23 +527,38 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
                             <FileText className="h-8 w-8 text-primary/60 mb-2" />
                             <span className="text-sm text-primary/60">Upload documents</span>
                             <span className="text-xs text-muted-foreground">PDF, JPG, PNG up to 5MB</span>
-                            <Input
-                              id="receipt-upload"
-                              type="file"
-                              accept=".pdf,image/*"
-                              className="hidden"
-                              onChange={(e) => handleFileUpload(e, 'receipt')}
-                              disabled={isUploading}
-                            />
                           </Label>
+                          <Input
+                            id="receipt-upload"
+                            type="file"
+                            accept=".pdf,image/*"
+                            className="hidden"
+                            onChange={(e) => handleFileUpload(e, 'receipt')}
+                            disabled={isUploading}
+                          />
                         </div>
+                        
+                        {/* Display file upload errors */}
+                        {uploadError && (
+                          <div className="mt-2 text-sm text-destructive">
+                            {uploadError}
+                          </div>
+                        )}
+                        
+                        {/* Display loading indicator */}
+                        {isUploading && (
+                          <div className="mt-4 flex items-center justify-center">
+                            <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                            <span className="text-sm">Uploading...</span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Preview uploaded receipts */}
                       {uploadedFiles.filter(file => file.type === 'receipt').length > 0 && (
                         <div className="space-y-2">
                           <h4 className="text-sm font-medium">Uploaded Documents</h4>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                             {uploadedFiles
                               .filter(file => file.type === 'receipt')
                               .map((file, index) => (
@@ -514,8 +566,8 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
                                   key={index} 
                                   className="relative border rounded-md overflow-hidden group p-2 flex flex-col items-center justify-center h-24"
                                 >
-                                  <FileText className="h-8 w-8 text-primary/60" />
-                                  <span className="text-xs truncate max-w-full px-4">{file.name}</span>
+                                  <FileText className="h-6 w-6 text-primary/60" />
+                                  <span className="text-xs truncate max-w-full px-4 mt-1">{file.name}</span>
                                   <div className="flex items-center gap-1 mt-1">
                                     <Button
                                       type="button"
@@ -552,10 +604,11 @@ const ClaimVerification = ({ itemId, itemName, finderId, isOpen, onClose }: Clai
                   </p>
                 </div>
                 
-                <DialogFooter>
+                <DialogFooter className="flex flex-col sm:flex-row gap-2">
                   <Button 
                     type="submit" 
                     disabled={submitting || isUploading || !form.formState.isValid}
+                    className="w-full sm:w-auto"
                   >
                     {submitting ? (
                       <>

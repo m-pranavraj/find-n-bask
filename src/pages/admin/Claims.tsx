@@ -28,15 +28,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, Loader2 } from "lucide-react";
+
+interface ClaimerInfo {
+  full_name: string;
+  email: string;
+}
+
+interface ItemInfo {
+  item_name: string;
+  category: string;
+}
 
 interface Claim {
   id: string;
@@ -46,14 +49,8 @@ interface Claim {
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   updated_at: string;
-  claimer?: {
-    full_name: string;
-    email: string;
-  };
-  item?: {
-    item_name: string;
-    category: string;
-  };
+  claimer?: ClaimerInfo;
+  item?: ItemInfo;
 }
 
 const Claims = () => {
@@ -74,15 +71,25 @@ const Claims = () => {
         .from('item_claims')
         .select(`
           *,
-          claimer:claimer_id(full_name, email),
-          item:item_id(item_name, category)
+          claimer:profiles!item_claims_claimer_id_fkey(full_name, email),
+          item:found_items!item_claims_item_id_fkey(item_name, category)
         `)
         .eq('status', claimStatus)
         .order('created_at', { ascending: false });
         
       if (error) throw error;
       
-      setClaims(data || []);
+      if (data) {
+        // Convert and ensure types match the Claim interface
+        const typedClaims = data.map(claim => ({
+          ...claim,
+          status: claim.status as 'pending' | 'approved' | 'rejected',
+          claimer: claim.claimer as ClaimerInfo,
+          item: claim.item as ItemInfo
+        }));
+        
+        setClaims(typedClaims);
+      }
     } catch (error) {
       console.error('Error fetching claims:', error);
       toast.error('Failed to load claims');
@@ -168,7 +175,7 @@ const Claims = () => {
                     <p className="text-muted-foreground">No {claimStatus} claims found</p>
                   </div>
                 ) : (
-                  <div className="border rounded-md">
+                  <div className="border rounded-md overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -210,7 +217,7 @@ const Claims = () => {
         {/* View Claim Dialog */}
         {selectedClaim && (
           <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Claim Details</DialogTitle>
                 <DialogDescription>
@@ -249,7 +256,7 @@ const Claims = () => {
                 {selectedClaim.status === 'pending' && (
                   <div className="space-y-2 mt-4">
                     <div className="font-medium">Update Status:</div>
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 flex-wrap">
                       <Button 
                         variant="default" 
                         className="bg-green-600 hover:bg-green-700"
