@@ -346,14 +346,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       
       setNewMessage('');
       
+      // Get user profile information for optimistic update
+      const userProfile = await getUserProfile(user.id);
+      
       // Optimistic update (will be overwritten by the subscription)
       const newMsg: Message = {
         ...messageData,
         id: Date.now().toString(),
         created_at: new Date().toISOString(),
         sender: {
-          full_name: user.full_name || 'You',
-          avatar_url: user.avatar_url || ''
+          full_name: userProfile?.full_name || 'You',
+          avatar_url: userProfile?.avatar_url || ''
         }
       };
       
@@ -400,7 +403,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  // Group messages by date
+  const getUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Exception fetching user profile:', error);
+      return null;
+    }
+  };
+
   const groupedMessages = messages.reduce((groups, message) => {
     const date = formatDate(message.created_at);
     if (!groups[date]) {

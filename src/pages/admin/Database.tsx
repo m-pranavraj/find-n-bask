@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,10 +47,43 @@ interface TableData {
   [key: string]: any;
 }
 
-// Type for the expected structure of table names from the database function
 interface TableNameResponse {
   table_name: string;
 }
+
+const VALID_TABLES = [
+  'found_items',
+  'item_claims',
+  'item_messages',
+  'lost_item_queries',
+  'profiles',
+  'success_stories'
+] as const;
+
+type ValidTableName = typeof VALID_TABLES[number];
+
+const isValidTable = (table: string): table is ValidTableName => {
+  return VALID_TABLES.includes(table as ValidTableName);
+};
+
+interface TestFoundItem {
+  item_name: string;
+  category: string;
+  location: string;
+  description: string;
+  contact_preference: string;
+  user_id: string;
+  images: string[];
+}
+
+interface TestProfile {
+  full_name: string;
+  email: string;
+  location: string;
+  bio: string;
+}
+
+type TestData = TestFoundItem | TestProfile;
 
 const Database = () => {
   const [tables, setTables] = useState<string[]>([]);
@@ -74,17 +106,14 @@ const Database = () => {
   const fetchTables = async () => {
     setIsLoading(true);
     try {
-      // Fetch all tables using the database function
       const { data, error } = await supabase.rpc('get_tables') as { data: TableNameResponse[] | null, error: any };
       
       if (error) throw error;
 
       if (data) {
-        // Extract table names from the response
         const tableNames = data.map(item => item.table_name);
         setTables(tableNames);
         
-        // Select the first table by default if available
         if (tableNames.length > 0 && !selectedTable) {
           setSelectedTable(tableNames[0]);
         }
@@ -100,7 +129,10 @@ const Database = () => {
   const fetchTableData = async (tableName: string) => {
     setIsLoading(true);
     try {
-      // Fetch table data
+      if (!isValidTable(tableName)) {
+        throw new Error(`Invalid table name: ${tableName}`);
+      }
+      
       const { data, error } = await supabase
         .from(tableName)
         .select('*')
@@ -109,7 +141,6 @@ const Database = () => {
       if (error) throw error;
 
       if (data) {
-        // Get column names from first row or set empty if no data
         const columnList = data.length > 0 
           ? Object.keys(data[0]).filter(col => col !== 'raw_user_meta_data') 
           : [];
@@ -135,7 +166,6 @@ const Database = () => {
     
     setIsLoading(true);
     try {
-      // Special handling for profiles table to preserve admin users
       if (selectedTable === 'profiles') {
         const { error } = await supabase.rpc('admin_reset_profiles');
         
@@ -143,7 +173,6 @@ const Database = () => {
         
         toast.success("Profiles reset successfully (admin users preserved)");
       } else {
-        // For other tables, use the admin_clear_table function
         const { error } = await supabase.rpc('admin_clear_table', { 
           table_name: selectedTable 
         });
@@ -153,7 +182,6 @@ const Database = () => {
         toast.success(`Table ${selectedTable} cleared successfully`);
       }
       
-      // Refetch table data
       fetchTableData(selectedTable);
     } catch (error) {
       console.error(`Error clearing table ${selectedTable}:`, error);
@@ -169,49 +197,45 @@ const Database = () => {
     
     setIsLoading(true);
     try {
-      let testData: Record<string, any>[] = [];
-      
-      // Create appropriate test data based on the selected table
-      switch (selectedTable) {
-        case 'found_items':
-          testData = [
-            {
-              item_name: "Test Laptop",
-              category: "Electronics",
-              location: "Library",
-              description: "Black Dell laptop found in the library",
-              contact_preference: "email",
-              user_id: "00000000-0000-0000-0000-000000000000", // Replace with valid user ID
-              images: []
-            }
-          ];
-          break;
-        case 'profiles':
-          testData = [
-            {
-              full_name: "Test User",
-              email: "test@example.com",
-              location: "Test Location",
-              bio: "This is a test user"
-            }
-          ];
-          break;
-        default:
-          toast.error("Test data not available for this table");
-          setIsLoading(false);
-          return;
-      }
-      
-      // Insert the test data
-      const { error } = await supabase
-        .from(selectedTable)
-        .insert(testData);
+      if (selectedTable === 'found_items') {
+        const testData: TestFoundItem = {
+          item_name: "Test Laptop",
+          category: "Electronics",
+          location: "Library",
+          description: "Black Dell laptop found in the library",
+          contact_preference: "email",
+          user_id: "00000000-0000-0000-0000-000000000000",
+          images: []
+        };
         
-      if (error) throw error;
+        const { error } = await supabase
+          .from('found_items')
+          .insert(testData);
+          
+        if (error) throw error;
+      } 
+      else if (selectedTable === 'profiles') {
+        const testData: TestProfile = {
+          full_name: "Test User",
+          email: "test@example.com",
+          location: "Test Location",
+          bio: "This is a test user"
+        };
+        
+        const { error } = await supabase
+          .from('profiles')
+          .insert(testData);
+          
+        if (error) throw error;
+      }
+      else {
+        toast.error("Test data not available for this table");
+        setIsLoading(false);
+        return;
+      }
       
       toast.success(`Test data inserted into ${selectedTable}`);
       
-      // Refetch table data
       fetchTableData(selectedTable);
     } catch (error) {
       console.error(`Error inserting test data into ${selectedTable}:`, error);
