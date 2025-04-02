@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
+import { deleteFoundItem } from "@/components/admin/database/DatabaseService";
 import { 
   Table, 
   TableBody, 
@@ -37,6 +38,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -44,6 +55,7 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const Items = () => {
   const [items, setItems] = useState<any[]>([]);
@@ -51,10 +63,21 @@ const Items = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Check if admin is authenticated
+    const adminAuthenticated = localStorage.getItem("adminAuthenticated") === "true";
+    if (!adminAuthenticated) {
+      toast.error("Admin authentication required");
+      navigate("/admin/login");
+      return;
+    }
+    
     fetchItems();
-  }, []);
+  }, [navigate]);
 
   const fetchItems = async () => {
     setIsLoading(true);
@@ -68,6 +91,7 @@ const Items = () => {
         throw error;
       }
 
+      console.log("Fetched items:", data);
       setItems(data || []);
     } catch (error) {
       console.error("Error fetching items:", error);
@@ -90,6 +114,27 @@ const Items = () => {
   const handleViewItem = (item: any) => {
     setSelectedItem(item);
     setViewDialogOpen(true);
+  };
+
+  const handleDeletePrompt = (itemId: string) => {
+    setItemToDelete(itemId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteItem = async () => {
+    if (!itemToDelete) return;
+    
+    setDeleteDialogOpen(false);
+    setViewDialogOpen(false);
+    
+    const success = await deleteFoundItem(itemToDelete);
+    
+    if (success) {
+      // Remove the item from the local state to update UI immediately
+      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete));
+      setItemToDelete(null);
+      setSelectedItem(null);
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -159,6 +204,10 @@ const Items = () => {
             <Button onClick={exportItems} variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
               Export
+            </Button>
+            <Button onClick={fetchItems} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
             </Button>
           </div>
         </div>
@@ -244,7 +293,12 @@ const Items = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-destructive"
+                              onClick={() => handleDeletePrompt(item.id)}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -337,7 +391,10 @@ const Items = () => {
                   <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
                     Close
                   </Button>
-                  <Button variant="destructive">
+                  <Button 
+                    variant="destructive"
+                    onClick={() => handleDeletePrompt(selectedItem.id)}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" /> 
                     Delete Item
                   </Button>
@@ -346,6 +403,28 @@ const Items = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the item and all associated images from storage.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteItem}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   );

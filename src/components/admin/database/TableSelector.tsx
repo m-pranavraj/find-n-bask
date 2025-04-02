@@ -45,26 +45,26 @@ const TableSelector = ({
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [isLoadingTables, setIsLoadingTables] = useState(true);
 
-  useEffect(() => {
-    const loadTables = async () => {
-      setIsLoadingTables(true);
-      try {
-        console.log("Fetching available tables...");
-        const tableNames = await fetchTables();
-        console.log("Tables fetched:", tableNames);
-        setTables(tableNames);
-        
-        if (tableNames.length > 0 && !selectedTable) {
-          setSelectedTable(tableNames[0]);
-        }
-      } catch (error) {
-        console.error("Error loading tables:", error);
-        toast.error("Failed to load database tables");
-      } finally {
-        setIsLoadingTables(false);
+  const loadTables = async () => {
+    setIsLoadingTables(true);
+    try {
+      console.log("Fetching available tables...");
+      const tableNames = await fetchTables();
+      console.log("Tables fetched:", tableNames);
+      setTables(tableNames);
+      
+      if (tableNames.length > 0 && !selectedTable) {
+        setSelectedTable(tableNames[0]);
       }
-    };
-    
+    } catch (error) {
+      console.error("Error loading tables:", error);
+      toast.error("Failed to load database tables");
+    } finally {
+      setIsLoadingTables(false);
+    }
+  };
+
+  useEffect(() => {
     loadTables();
   }, [setSelectedTable, selectedTable]);
 

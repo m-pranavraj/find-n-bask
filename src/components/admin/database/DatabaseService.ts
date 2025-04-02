@@ -153,3 +153,63 @@ export const insertTestData = async (tableName: string): Promise<boolean> => {
     return false;
   }
 };
+
+// Add new function to delete an item from found_items table
+export const deleteFoundItem = async (itemId: string): Promise<boolean> => {
+  try {
+    // First, try to delete the images from storage
+    const { data: item, error: fetchError } = await supabase
+      .from('found_items')
+      .select('images')
+      .eq('id', itemId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // If the item has images, delete them from storage
+    if (item && item.images && item.images.length > 0) {
+      console.log("Removing images:", item.images);
+      
+      for (const imageUrl of item.images) {
+        // Extract the path from the URL
+        // Format is typically: https://[project-ref].supabase.co/storage/v1/object/public/[bucket]/[path]
+        try {
+          const bucket = 'found-item-images';
+          const urlParts = imageUrl.split('/');
+          const pathIndex = urlParts.indexOf('public');
+          
+          if (pathIndex >= 0 && pathIndex < urlParts.length - 2) {
+            const path = urlParts.slice(pathIndex + 2).join('/');
+            console.log(`Deleting file: ${bucket}/${path}`);
+            
+            const { error: storageError } = await supabase
+              .storage
+              .from(bucket)
+              .remove([path]);
+              
+            if (storageError) {
+              console.error("Error deleting image:", storageError);
+            }
+          }
+        } catch (imgError) {
+          console.error("Error processing image URL:", imgError);
+        }
+      }
+    }
+    
+    // Now delete the item from the database
+    const { error: deleteError } = await supabase
+      .from('found_items')
+      .delete()
+      .eq('id', itemId);
+      
+    if (deleteError) throw deleteError;
+    
+    toast.success("Item deleted successfully");
+    return true;
+  } catch (error) {
+    console.error("Error deleting item:", error);
+    toast.error("Failed to delete item");
+    return false;
+  }
+};

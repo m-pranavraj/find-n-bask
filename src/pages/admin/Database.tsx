@@ -7,6 +7,8 @@ import DataTable from "@/components/admin/database/DataTable";
 import { fetchTableData, clearTable, insertTestData } from "@/components/admin/database/DatabaseService";
 import { TableData } from "@/components/admin/database/utils";
 import { useNavigate } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const Database = () => {
   const [selectedTable, setSelectedTable] = useState<string>("");
@@ -80,11 +82,23 @@ const Database = () => {
   return (
     <AdminLayout title="Database Management">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Database Management</h2>
-          <p className="text-muted-foreground mt-1">
-            View and manage database tables and records
-          </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Database Management</h2>
+            <p className="text-muted-foreground mt-1">
+              View and manage database tables and records
+            </p>
+          </div>
+          <div>
+            <Button 
+              variant="outline" 
+              onClick={() => selectedTable && handleFetchTableData(selectedTable)}
+              disabled={!selectedTable || isLoading}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh Data
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row gap-6">
