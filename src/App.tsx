@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import ProtectedRoute from "@/components/layout/ProtectedRoute";
@@ -28,6 +28,15 @@ import AdminNavbar from "./components/layout/AdminNavbar";
 
 const queryClient = new QueryClient();
 
+// Custom component to conditionally render AdminNavbar only on admin routes
+const ConditionalAdminNavbar = () => {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin') && 
+                       location.pathname !== '/admin/login';
+  
+  return isAdminRoute ? <AdminNavbar /> : null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -36,7 +45,6 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <AdminNavbar />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Index />} />
@@ -65,6 +73,7 @@ const App = () => (
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <ConditionalAdminNavbar />
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

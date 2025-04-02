@@ -6,22 +6,34 @@ import TableSelector from "@/components/admin/database/TableSelector";
 import DataTable from "@/components/admin/database/DataTable";
 import { fetchTableData, clearTable, insertTestData } from "@/components/admin/database/DatabaseService";
 import { TableData } from "@/components/admin/database/utils";
+import { useNavigate } from "react-router-dom";
 
 const Database = () => {
   const [selectedTable, setSelectedTable] = useState<string>("");
   const [tableData, setTableData] = useState<TableData[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Check if admin is authenticated
+    const adminAuthenticated = localStorage.getItem("adminAuthenticated") === "true";
+    if (!adminAuthenticated) {
+      toast.error("Admin authentication required");
+      navigate("/admin/login");
+      return;
+    }
+    
     if (selectedTable) {
       handleFetchTableData(selectedTable);
     } else {
       setIsLoading(false);
     }
-  }, [selectedTable]);
+  }, [selectedTable, navigate]);
 
   const handleFetchTableData = async (tableName: string) => {
+    if (!tableName) return;
+    
     setIsLoading(true);
     try {
       console.log("Fetching data for table:", tableName);

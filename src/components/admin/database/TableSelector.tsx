@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 interface TableSelectorProps {
   selectedTable: string;
@@ -42,14 +43,25 @@ const TableSelector = ({
 }: TableSelectorProps) => {
   const [tables, setTables] = useState<string[]>([]);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isLoadingTables, setIsLoadingTables] = useState(true);
 
   useEffect(() => {
     const loadTables = async () => {
-      const tableNames = await fetchTables();
-      setTables(tableNames);
-      
-      if (tableNames.length > 0 && !selectedTable) {
-        setSelectedTable(tableNames[0]);
+      setIsLoadingTables(true);
+      try {
+        console.log("Fetching available tables...");
+        const tableNames = await fetchTables();
+        console.log("Tables fetched:", tableNames);
+        setTables(tableNames);
+        
+        if (tableNames.length > 0 && !selectedTable) {
+          setSelectedTable(tableNames[0]);
+        }
+      } catch (error) {
+        console.error("Error loading tables:", error);
+        toast.error("Failed to load database tables");
+      } finally {
+        setIsLoadingTables(false);
       }
     };
     
@@ -63,9 +75,22 @@ const TableSelector = ({
         <CardDescription>Select a table to view or manage</CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading && tables.length === 0 ? (
+        {isLoadingTables ? (
           <div className="flex justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : tables.length === 0 ? (
+          <div className="text-center py-4">
+            <p className="text-muted-foreground">No tables available</p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-2"
+              onClick={() => loadTables()}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
           </div>
         ) : (
           <div className="space-y-4">

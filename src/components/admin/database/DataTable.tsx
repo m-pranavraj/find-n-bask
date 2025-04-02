@@ -9,7 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DatabaseIcon, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { DatabaseIcon, Loader2, AlertCircle } from "lucide-react";
 
 interface DataTableProps {
   selectedTable: string;
@@ -44,11 +46,18 @@ const DataTable = ({
           </div>
         ) : isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading table data...</p>
+            </div>
           </div>
         ) : tableData.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-muted-foreground">No records found</p>
+            <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground/50" />
+            <p className="text-muted-foreground mt-4">No records found in {selectedTable}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Try inserting test data or check your database connection
+            </p>
           </div>
         ) : (
           <div className="border rounded-md overflow-auto max-h-[70vh]">

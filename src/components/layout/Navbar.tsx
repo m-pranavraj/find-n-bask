@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
-import { Menu, X, LogOut, User, Shield } from "lucide-react";
+import { Menu, X, LogOut, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,8 +56,12 @@ const Navbar = () => {
     await signOut();
   };
 
-  // Check if user is admin
+  // Check if user is admin - don't display public buttons for this
   const isAdmin = localStorage.getItem("adminAuthenticated") === "true";
+  const isAdminSection = location.pathname.startsWith("/admin");
+
+  // Don't show main navbar on admin pages
+  if (isAdminSection) return null;
 
   return (
     <header
@@ -132,6 +137,11 @@ const Navbar = () => {
                 <Link to="/profile">
                   <DropdownMenuItem>Profile</DropdownMenuItem>
                 </Link>
+                {isAdmin && (
+                  <Link to="/admin/dashboard">
+                    <DropdownMenuItem>Admin Dashboard</DropdownMenuItem>
+                  </Link>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -175,12 +185,11 @@ const Navbar = () => {
               {isAuthenticated ? (
                 <>
                   {isAdmin && (
-                    <Button variant="outline" size="sm" asChild>
-                      <Link to="/admin/dashboard">
-                        <Shield className="h-4 w-4 mr-2" />
-                        Admin
-                      </Link>
-                    </Button>
+                    <Link to="/admin/dashboard">
+                      <Button variant="outline" size="sm" className="w-full">
+                        Admin Dashboard
+                      </Button>
+                    </Link>
                   )}
                   <Link to="/dashboard">
                     <Button variant="ghost" className="w-full justify-start">

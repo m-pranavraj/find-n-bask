@@ -31,11 +31,8 @@ export interface TableData {
 // Fetch available tables from Supabase
 export const fetchTables = async (): Promise<string[]> => {
   try {
-    // Explicitly type the RPC call
-    const { data, error } = await supabase.rpc('get_tables') as { 
-      data: TableNameResponse[] | null, 
-      error: any 
-    };
+    // Explicitly type the RPC call with the correct return type
+    const { data, error } = await supabase.rpc<TableNameResponse[]>('get_tables');
     
     if (error) throw error;
 
