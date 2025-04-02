@@ -25,6 +25,7 @@ import {
   Eye, 
   Image, 
   Package, 
+  RefreshCw, 
   Search, 
   SlidersHorizontal, 
   Trash2 

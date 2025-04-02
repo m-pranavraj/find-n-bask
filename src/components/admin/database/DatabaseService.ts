@@ -81,10 +81,8 @@ export const clearTable = async (tableName: string): Promise<boolean> => {
       }
       
       // Use a type assertion after validation to satisfy TypeScript
-      const validTableName = tableName as ValidTableName;
-      
       const { error } = await supabase.rpc('admin_clear_table', { 
-        table_name: validTableName
+        table_name: tableName as ValidTableName
       });
       
       if (error) throw error;

@@ -31,12 +31,13 @@ export interface TableData {
 // Fetch available tables from Supabase
 export const fetchTables = async (): Promise<string[]> => {
   try {
-    // Explicitly type the RPC call with the correct return type
-    const { data, error } = await supabase.rpc<TableNameResponse[]>('get_tables', {});
+    // Fix: Properly type the RPC call
+    const { data, error } = await supabase.rpc<TableNameResponse>('get_tables');
     
     if (error) throw error;
 
     if (data) {
+      // Since data is now properly typed as TableNameResponse[], .map is valid
       return data.map(item => item.table_name);
     }
     return [];
